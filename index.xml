@@ -32,10 +32,8 @@
 
     <!-- Sections Configuration -->
     <sections>
-        <section id="A" name="Section A" capacity="40"/>
-        <section id="B" name="Section B" capacity="40"/>
-        <section id="C" name="Section C" capacity="35"/>
-        <section id="D" name="Section D" capacity="35"/>
+        <section id="A" name="Section A" capacity="65"/>
+        <section id="B" name="Section B" capacity="80"/>
     </sections>
 
     <!-- Admin Configuration -->
@@ -60,14 +58,14 @@
 
     <!-- Subjects Configuration -->
     <subjects>
-        <subject code="CS501" name="Data Structures and Algorithms" type="Core" credits="4"/>
-        <subject code="CS502" name="Computer Networks" type="Core" credits="4"/>
-        <subject code="CS503" name="Database Management Systems" type="Core" credits="4"/>
-        <subject code="CS504" name="Operating Systems" type="Core" credits="4"/>
-        <subject code="CS505" name="Software Engineering" type="Core" credits="3"/>
-        <subject code="CS506" name="Web Technologies" type="Core" credits="3"/>
-        <subject code="CS507" name="Machine Learning" type="Elective" credits="3"/>
-        <subject code="CS508" name="Cybersecurity" type="Elective" credits="3"/>
+        <subject code="CS501" name="Theory of Computation " type="Core" credits="4"/>
+        <subject code="CS502" name="Database Management System" type="Core" credits="4"/>
+        <subject code="CS503" name="Data Analytics " type="Departments Elective" credits="4"/>
+        <subject code="CS504" name="Internet and Web Development" type="Open Elective" credits="4"/>
+        <subject code="CS505" name="Linux" type="Lab" credits="3"/>
+        <subject code="CS506" name="Python" type="Lab" credits="3"/>
+        <subject code="CS507" name="Internship-3" type="Elective" credits="3"/>
+        <subject code="CS508" name="Minor Project" type="Lab" credits="3"/>
     </subjects>
 
     <!-- Timetable Configuration -->
@@ -75,10 +73,10 @@
         <!-- Section A Timetable -->
         <section id="A">
             <day name="Monday">
-                <slot time="09:00-10:00" subject="CS501" type="Theory" room="A101"/>
-                <slot time="10:00-11:00" subject="CS502" type="Lab" room="Lab1"/>
-                <slot time="11:00-12:00" subject="CS503" type="Theory" room="A102"/>
-                <slot time="12:00-13:00" subject="Lunch" type="Break" room="-"/>
+                <slot time="09:10-10:00" subject="CS501" type="Theory" room="S20"/>
+                <slot time="10:00-10:50" subject="CS502" type="Theory" room="S20"/>
+                <slot time="10:50-11:40" subject="CS504" type="Theory" room="S20"/>
+                <slot time="12:30-1:20" subject="Lunch" type="Break" room="-"/>
                 <slot time="13:00-14:00" subject="CS504" type="Theory" room="A101"/>
                 <slot time="14:00-15:00" subject="CS505" type="Lab" room="Lab2"/>
             </day>
