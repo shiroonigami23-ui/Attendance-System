@@ -1,6 +1,3 @@
-/* Complete Attendance System JavaScript - All functionality in one file */
-
-// Configuration Parser - Loads settings from config.xml
 class ConfigManager {
     constructor() {
         this.config = null;
