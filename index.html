@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Attendance System</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js"></script>
+</head>
+<body>
+  <!-- Optionally use JS to fetch and display XML content -->
+  <script>
+    fetch('index.xml')
+      .then(response => response.text())
+      .then(str => {
+        document.body.innerHTML += `<pre>${str}</pre>`;
+      });
+  </script>
+</body>
+</html>
