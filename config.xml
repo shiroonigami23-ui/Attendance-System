@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<attendance-system-config>
+    <!-- System Information -->
+    <system>
+        <name>Advanced Campus Attendance System</name>
+        <institution>RJIT BSF Academy</institution>
+        <version>2.0</version>
+        <academic-year>2024-25</academic-year>
+        <semester>Winter</semester>
+    </system>
+
+    <!-- Roll Number Configuration -->
+    <roll-numbers>
+        <!-- CS Students: 0902CS231001 to 0902CS231150 -->
+        <range>
+            <type>CS</type>
+            <prefix>0902CS231</prefix>
+            <start>001</start>
+            <end>150</end>
+            <format>0902CS231XXX</format>
+        </range>
+        
+        <!-- Department Students: D01 to D04 -->
+        <range>
+            <type>Department</type>
+            <prefix>D</prefix>
+            <start>01</start>
+            <end>04</end>
+            <format>DXX</format>
+        </range>
+    </roll-numbers>
+
+    <!-- Sections Configuration -->
+    <sections>
+        <section id="A" name="Section A" capacity="40"/>
+        <section id="B" name="Section B" capacity="40"/>
+        <section id="C" name="Section C" capacity="35"/>
+        <section id="D" name="Section D" capacity="35"/>
+    </sections>
+
+    <!-- Admin Configuration -->
+    <admin>
+        <username>admin</username>
+        <password>ShiroOni</password>
+        <email>admin@rjit.academy</email>
+        <full-name>System Administrator</full-name>
+    </admin>
+
+    <!-- System Settings -->
+    <settings>
+        <max-devices-per-user>1</max-devices-per-user>
+        <attendance-time-window>30</attendance-time-window> <!-- minutes -->
+        <auto-logout-time>0</auto-logout-time> <!-- 0 means disabled -->
+        <require-qr-for-attendance>false</require-qr-for-attendance>
+        <enable-notifications>true</enable-notifications>
+        <session-timeout>24</session-timeout> <!-- hours -->
+        <max-login-attempts>3</max-login-attempts>
+        <lockout-duration>15</lockout-duration> <!-- minutes -->
+    </settings>
+
+    <!-- Subjects Configuration -->
+    <subjects>
+        <subject code="CS501" name="Data Structures and Algorithms" type="Core" credits="4"/>
+        <subject code="CS502" name="Computer Networks" type="Core" credits="4"/>
+        <subject code="CS503" name="Database Management Systems" type="Core" credits="4"/>
+        <subject code="CS504" name="Operating Systems" type="Core" credits="4"/>
+        <subject code="CS505" name="Software Engineering" type="Core" credits="3"/>
+        <subject code="CS506" name="Web Technologies" type="Core" credits="3"/>
+        <subject code="CS507" name="Machine Learning" type="Elective" credits="3"/>
+        <subject code="CS508" name="Cybersecurity" type="Elective" credits="3"/>
+    </subjects>
+
+    <!-- Timetable Configuration -->
+    <timetable>
+        <!-- Section A Timetable -->
+        <section id="A">
+            <day name="Monday">
+                <slot time="09:00-10:00" subject="CS501" type="Theory" room="A101"/>
+                <slot time="10:00-11:00" subject="CS502" type="Lab" room="Lab1"/>
+                <slot time="11:00-12:00" subject="CS503" type="Theory" room="A102"/>
+                <slot time="12:00-13:00" subject="Lunch" type="Break" room="-"/>
+                <slot time="13:00-14:00" subject="CS504" type="Theory" room="A101"/>
+                <slot time="14:00-15:00" subject="CS505" type="Lab" room="Lab2"/>
+            </day>
+            <day name="Tuesday">
+                <slot time="09:00-10:00" subject="CS506" type="Theory" room="A103"/>
+                <slot time="10:00-11:00" subject="CS507" type="Theory" room="A101"/>
+                <slot time="11:00-12:00" subject="CS508" type="Lab" room="Lab1"/>
+                <slot time="12:00-13:00" subject="Lunch" type="Break" room="-"/>
+                <slot time="13:00-14:00" subject="CS501" type="Tutorial" room="A102"/>
+                <slot time="14:00-15:00" subject="CS502" type="Theory" room="A101"/>
+            </day>
+            <day name="Wednesday">
+                <slot time="09:00-10:00" subject="CS503" type="Lab" room="Lab2"/>
+                <slot time="10:00-11:00" subject="CS504" type="Theory" room="A103"/>
+                <slot time="11:00-12:00" subject="CS505" type="Theory" room="A101"/>
+                <slot time="12:00-13:00" subject="Lunch" type="Break" room="-"/>
+                <slot time="13:00-14:00" subject="CS506" type="Lab" room="Lab1"/>
+                <slot time="14:00-15:00" subject="CS507" type="Theory" room="A102"/>
+            </day>
+            <day name="Thursday">
+                <slot time="09:00-10:00" subject="CS508" type="Theory" room="A101"/>
+                <slot time="10:00-11:00" subject="CS501" type="Lab" room="Lab2"/>
+                <slot time="11:00-12:00" subject="CS502" type="Theory" room="A103"/>
+                <slot time="12:00-13:00" subject="Lunch" type="Break" room="-"/>
+                <slot time="13:00-14:00" subject="CS503" type="Theory" room="A101"/>
+                <slot time="14:00-15:00" subject="CS504" type="Lab" room="Lab1"/>
+            </day>
+            <day name="Friday">
+                <slot time="09:00-10:00" subject="CS505" type="Theory" room="A102"/>
+                <slot time="10:00-11:00" subject="CS506" type="Theory" room="A101"/>
+                <slot time="11:00-12:00" subject="CS507" type="Lab" room="Lab2"/>
+                <slot time="12:00-13:00" subject="Lunch" type="Break" room="-"/>
+                <slot time="13:00-14:00" subject="CS508" type="Theory" room="A103"/>
+                <slot time="14:00-15:00" subject="Free Period" type="Free" room="-"/>
+            </day>
+        </section>
+
+        <!-- Section B Timetable -->
+        <section id="B">
+            <day name="Monday">
+                <slot time="10:00-11:00" subject="CS501" type="Theory" room="B101"/>
+                <slot time="11:00-12:00" subject="CS502" type="Lab" room="Lab3"/>
+                <slot time="12:00-13:00" subject="CS503" type="Theory" room="B102"/>
+                <slot time="13:00-14:00" subject="Lunch" type="Break" room="-"/>
+                <slot time="14:00-15:00" subject="CS504" type="Theory" room="B101"/>
+                <slot time="15:00-16:00" subject="CS505" type="Lab" room="Lab3"/>
+            </day>
+            <day name="Tuesday">
+                <slot time="10:00-11:00" subject="CS506" type="Theory" room="B103"/>
+                <slot time="11:00-12:00" subject="CS507" type="Theory" room="B101"/>
+                <slot time="12:00-13:00" subject="CS508" type="Lab" room="Lab3"/>
+                <slot time="13:00-14:00" subject="Lunch" type="Break" room="-"/>
+                <slot time="14:00-15:00" subject="CS501" type="Tutorial" room="B102"/>
+                <slot time="15:00-16:00" subject="CS502" type="Theory" room="B101"/>
+            </day>
+            <day name="Wednesday">
+                <slot time="10:00-11:00" subject="CS503" type="Lab" room="Lab3"/>
+                <slot time="11:00-12:00" subject="CS504" type="Theory" room="B103"/>
+                <slot time="12:00-13:00" subject="CS505" type="Theory" room="B101"/>
+                <slot time="13:00-14:00" subject="Lunch" type="Break" room="-"/>
+                <slot time="14:00-15:00" subject="CS506" type="Lab" room="Lab3"/>
+                <slot time="15:00-16:00" subject="CS507" type="Theory" room="B102"/>
+            </day>
+            <day name="Thursday">
+                <slot time="10:00-11:00" subject="CS508" type="Theory" room="B101"/>
+                <slot time="11:00-12:00" subject="CS501" type="Lab" room="Lab3"/>
+                <slot time="12:00-13:00" subject="CS502" type="Theory" room="B103"/>
+                <slot time="13:00-14:00" subject="Lunch" type="Break" room="-"/>
+                <slot time="14:00-15:00" subject="CS503" type="Theory" room="B101"/>
+                <slot time="15:00-16:00" subject="CS504" type="Lab" room="Lab3"/>
+            </day>
+            <day name="Friday">
+                <slot time="10:00-11:00" subject="CS505" type="Theory" room="B102"/>
+                <slot time="11:00-12:00" subject="CS506" type="Theory" room="B101"/>
+                <slot time="12:00-13:00" subject="CS507" type="Lab" room="Lab3"/>
+                <slot time="13:00-14:00" subject="Lunch" type="Break" room="-"/>
+                <slot time="14:00-15:00" subject="CS508" type="Theory" room="B103"/>
+                <slot time="15:00-16:00" subject="Free Period" type="Free" room="-"/>
+            </day>
+        </section>
+
+        <!-- Similar structure for sections C and D can be added -->
+    </timetable>
+
+    <!-- Rooms Configuration -->
+    <rooms>
+        <room id="A101" name="Classroom A101" capacity="45" type="Theory"/>
+        <room id="A102" name="Classroom A102" capacity="45" type="Theory"/>
+        <room id="A103" name="Classroom A103" capacity="45" type="Theory"/>
+        <room id="B101" name="Classroom B101" capacity="45" type="Theory"/>
+        <room id="B102" name="Classroom B102" capacity="45" type="Theory"/>
+        <room id="B103" name="Classroom B103" capacity="45" type="Theory"/>
+        <room id="Lab1" name="Computer Lab 1" capacity="30" type="Lab"/>
+        <room id="Lab2" name="Computer Lab 2" capacity="30" type="Lab"/>
+        <room id="Lab3" name="Computer Lab 3" capacity="30" type="Lab"/>
+    </rooms>
+
+    <!-- Notification Templates -->
+    <notifications>
+        <template id="class-reminder" title="Class Reminder">
+            <message>Your {subject} class starts in {minutes} minutes in {room}</message>
+            <icon>fa-clock</icon>
+            <type>upcoming</type>
+        </template>
+        <template id="attendance-time" title="Attendance Time">
+            <message>Attendance is now open for {subject}. Please mark your attendance.</message>
+            <icon>fa-calendar-check</icon>
+            <type>attendance-time</type>
+        </template>
+        <template id="urgent-notice" title="Urgent Notice">
+            <message>{message}</message>
+            <icon>fa-exclamation-triangle</icon>
+            <type>urgent</type>
+        </template>
+    </notifications>
+
+    <!-- Security Configuration -->
+    <security>
+        <device-fingerprinting>
+            <enabled>true</enabled>
+            <factors>
+                <factor>user-agent</factor>
+                <factor>screen-resolution</factor>
+                <factor>timezone</factor>
+                <factor>language</factor>
+                <factor>platform</factor>
+                <factor>canvas-fingerprint</factor>
+            </factors>
+        </device-fingerprinting>
+        <session-security>
+            <enforce-https>true</enforce-https>
+            <secure-cookies>true</secure-cookies>
+            <csrf-protection>true</csrf-protection>
+        </session-security>
+    </security>
+
+    <!-- Feature Flags -->
+    <features>
+        <feature name="qr-attendance" enabled="true"/>
+        <feature name="manual-attendance" enabled="true"/>
+        <feature name="bulk-operations" enabled="true"/>
+        <feature name="export-reports" enabled="true"/>
+        <feature name="notifications" enabled="true"/>
+        <feature name="dark-theme" enabled="true"/>
+        <feature name="offline-mode" enabled="false"/>
+    </features>
+
+    <!-- API Configuration -->
+    <api>
+        <base-url>http://localhost:3000</base-url>
+        <version>v1</version>
+        <timeout>30000</timeout> <!-- milliseconds -->
+        <retry-attempts>3</retry-attempts>
+    </api>
+
+    <!-- Storage Configuration -->
+    <storage>
+        <local-storage>
+            <max-size>10485760</max-size> <!-- 10MB in bytes -->
+            <encryption>false</encryption>
+        </local-storage>
+        <session-storage>
+            <enabled>true</enabled>
+        </session-storage>
+    </storage>
+
+    <!-- Backup Configuration -->
+    <backup>
+        <auto-backup>true</auto-backup>
+        <interval>24</interval> <!-- hours -->
+        <retention>30</retention> <!-- days -->
+    </backup>
+
+    <!-- Logging Configuration -->
+    <logging>
+        <level>INFO</level>
+        <console>true</console>
+        <file>false</file>
+        <max-entries>1000</max-entries>
+    </logging>
+</attendance-system-config>
