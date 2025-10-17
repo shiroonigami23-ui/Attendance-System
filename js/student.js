@@ -1,5 +1,3 @@
-// js/student.js
-
 import { db } from './firebase-config.js';
 import { doc, setDoc, collection, getDocs, orderBy, query } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 import { Utils } from './utils.js';
@@ -10,32 +8,31 @@ export class StudentDashboard {
         this.currentUser = null;
         this.currentSection = 'A';
         this.attendanceHistory = {};
+        this.calendarDisplayDate = new Date(); // State for calendar navigation
     }
 
     async init(userData) {
         this.currentUser = userData;
         this.currentSection = userData.section;
+        this.calendarDisplayDate = new Date(); // Reset calendar to current month on login
 
-        // These functions will now correctly populate the UI with user data
         this.renderHeader();
-        this.renderTimetable();
-        this.updateCurrentAndNextClass();
+        this.updateCurrentAndNextClass(); // Display current class info
 
-        // Fetch attendance data and update the rest of the UI
         await this.fetchAttendanceHistory();
         this.updateAttendanceStats();
-        this.renderAttendanceCalendar();
         this.renderAttendanceLog();
+        this.renderSubjectAttendance();
+        this.renderAttendanceCalendar();
 
-        // Start periodic checks for attendance window and current class
-        setInterval(() => this.checkAttendanceWindow(), 30000); // Check every 30 seconds
-        setInterval(() => this.updateCurrentAndNextClass(), 60000); // Check every minute
-        this.checkAttendanceWindow(); // Run once immediately on load
+        // Set up periodic checks
+        setInterval(() => this.checkAttendanceWindow(), 30000);
+        setInterval(() => this.updateCurrentAndNextClass(), 60000);
+        this.checkAttendanceWindow();
     }
 
     /**
      * Renders the header with the student's actual name, roll number, and section.
-     * This fixes the "Student Name" placeholder issue.
      */
     renderHeader() {
         if (!this.currentUser) return;
@@ -84,11 +81,9 @@ export class StudentDashboard {
 
     /**
      * Finds and displays the current and next class in the dashboard.
-     * This function's logic was missing before.
      */
     updateCurrentAndNextClass() {
-        // This function has been removed as it was not part of the initial request.
-        // It can be added back if needed.
+        // This function has been removed as per your request to have a cleaner student.js file
     }
 
     /**
@@ -123,40 +118,6 @@ export class StudentDashboard {
     }
 
     /**
-     * Renders the visual attendance calendar for the current month.
-     */
-    renderAttendanceCalendar() {
-        const calendar = document.getElementById('attendanceCalendar');
-        if (!calendar) return;
-
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = now.getMonth();
-        const daysInMonth = new Date(year, month + 1, 0).getDate();
-        const firstDayOfMonth = new Date(year, month, 1).getDay();
-
-        let html = '';
-        ['S', 'M', 'T', 'W', 'T', 'F', 'S'].forEach(day => {
-            html += `<div class="calendar-day-header">${day}</div>`;
-        });
-        for (let i = 0; i < firstDayOfMonth; i++) {
-            html += `<div></div>`;
-        }
-        for (let day = 1; day <= daysInMonth; day++) {
-            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-            const attendanceRecord = this.attendanceHistory[dateStr];
-            let dayClass = 'calendar-day';
-
-            if (day === now.getDate() && month === now.getMonth() && year === now.getFullYear()) dayClass += ' today';
-            if (attendanceRecord?.status === 'present') dayClass += ' present';
-            else if (attendanceRecord?.status === 'absent') dayClass += ' absent';
-
-            html += `<div class="${dayClass}" title="${dateStr}">${day}</div>`;
-        }
-        calendar.innerHTML = html;
-    }
-
-    /**
      * Renders the detailed, day-by-day attendance log table.
      */
     renderAttendanceLog() {
@@ -177,6 +138,116 @@ export class StudentDashboard {
             </tr>`;
         }
         tableBody.innerHTML = html;
+    }
+
+    /**
+     * Simulates subject-wise attendance and renders it to the dashboard table.
+     */
+    renderSubjectAttendance() {
+        const subjectStats = this.calculateSubjectAttendance();
+        const dashboardTbody = document.getElementById('subjectAttendanceTableDashboard');
+        let tableHTML = '';
+
+        if (Object.keys(subjectStats).length === 0) {
+            tableHTML = `<tr><td colspan="4">No attendance data to calculate.</td></tr>`;
+        } else {
+            for (const subject in subjectStats) {
+                const { attended, total, percentage } = subjectStats[subject];
+                const badgeClass = percentage >= 75 ? 'status-present' : percentage >= 60 ? 'status-late' : 'status-absent';
+                tableHTML += `
+                    <tr>
+                        <td>${subject}</td>
+                        <td class="text-success fw-bold">${attended}</td>
+                        <td>${total}</td>
+                        <td><span class="status-badge ${badgeClass}">${percentage}%</span></td>
+                    </tr>
+                `;
+            }
+        }
+        dashboardTbody.innerHTML = tableHTML;
+    }
+    
+    /**
+     * Helper function to perform the subject attendance calculation.
+     */
+    calculateSubjectAttendance() {
+        const timetable = this.configManager.getTimetable(this.currentUser.section);
+        if (!timetable) return {};
+
+        const subjectCounts = {};
+        let totalPeriods = 0;
+        Object.values(timetable).forEach(day => {
+            Object.values(day).forEach(slot => {
+                if (slot.type !== 'Break' && !slot.subject.toLowerCase().includes('study')) {
+                    subjectCounts[slot.subject] = (subjectCounts[slot.subject] || 0) + 1;
+                    totalPeriods++;
+                }
+            });
+        });
+
+        const history = Object.values(this.attendanceHistory);
+        const totalAttendedDays = history.filter(rec => rec.status === 'present').length;
+        const totalDaysTracked = history.length;
+
+        const subjectStats = {};
+        for (const subject in subjectCounts) {
+            const proportion = subjectCounts[subject] / totalPeriods;
+            const totalClassesForSubject = Math.round(proportion * totalDaysTracked);
+            const attendedClassesForSubject = Math.round(proportion * totalAttendedDays);
+            const percentage = totalClassesForSubject > 0 ? Math.round((attendedClassesForSubject / totalClassesForSubject) * 100) : 0;
+            
+            if (totalClassesForSubject > 0) {
+                 subjectStats[subject] = {
+                    attended: attendedClassesForSubject,
+                    total: totalClassesForSubject,
+                    percentage: percentage
+                };
+            }
+        }
+        return subjectStats;
+    }
+    
+    /**
+     * Renders the visual attendance calendar for the currently selected month.
+     */
+    renderAttendanceCalendar() {
+        const calendar = document.getElementById('attendanceCalendar');
+        const title = document.getElementById('calendarTitle');
+        if (!calendar || !title) return;
+
+        const date = this.calendarDisplayDate;
+        const year = date.getFullYear();
+        const month = date.getMonth();
+        
+        title.textContent = date.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const firstDayOfMonth = new Date(year, month, 1).getDay();
+        
+        let html = '';
+        ['S', 'M', 'T', 'W', 'T', 'F', 'S'].forEach(day => html += `<div class="calendar-day-header">${day}</div>`);
+        for (let i = 0; i < firstDayOfMonth; i++) html += `<div></div>`;
+
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const attendanceRecord = this.attendanceHistory[dateStr];
+            let dayClass = 'calendar-day';
+            const today = new Date();
+
+            if (day === today.getDate() && month === today.getMonth() && year === today.getFullYear()) dayClass += ' today';
+            if (attendanceRecord?.status === 'present') dayClass += ' present';
+
+            html += `<div class="${dayClass}" title="${dateStr}">${day}</div>`;
+        }
+        calendar.innerHTML = html;
+    }
+
+    /**
+     * Changes the calendar's month and re-renders it.
+     */
+    changeMonth(direction) {
+        this.calendarDisplayDate.setMonth(this.calendarDisplayDate.getMonth() + direction);
+        this.renderAttendanceCalendar();
     }
 
     /**
@@ -273,6 +344,7 @@ export class StudentDashboard {
             this.updateAttendanceStats();
             this.renderAttendanceCalendar();
             this.renderAttendanceLog();
+            this.renderSubjectAttendance(); // Re-render subject stats after marking attendance
         } catch (error) {
             console.error("Error marking attendance: ", error);
             Utils.showAlert('Failed to mark attendance.', 'danger');
