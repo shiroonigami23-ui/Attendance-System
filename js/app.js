@@ -90,13 +90,22 @@ window.switchDashboardTab = (tabId) => {
     document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
     document.getElementById(`${tabId}Tab`).classList.add('active');
     document.querySelector(`[onclick="switchDashboardTab('${tabId}')"]`).classList.add('active');
+
+    if (tabId === 'timetable') {
+        window.app.studentDashboard.renderTimetable();
+    }
 };
+
 
 window.switchAdminTab = (tabId) => {
     document.querySelectorAll('.tab-panel').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
     document.getElementById(`admin${tabId.charAt(0).toUpperCase() + tabId.slice(1)}Tab`).classList.add('active');
     document.querySelector(`[onclick="switchAdminTab('${tabId}')"]`).classList.add('active');
+};
+
+window.changeCalendarMonth = (direction) => {
+    window.app.studentDashboard.changeMonth(direction);
 };
 
 window.adminLogout = () => {
