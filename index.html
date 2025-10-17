@@ -64,22 +64,9 @@
             </div>
         </div>
 
-        <div id="studentDashboard" class="hidden">
+            <div id="studentDashboard" class="hidden">
     <header class="header">
-        <div class="header-content">
-            <div>
-                <h1><span id="userAvatar" class="user-avatar">S</span> <span id="userName">Student Name</span></h1>
-                <p><span id="userRoll">Roll Number</span> | <span id="userSection">Section</span></p>
-            </div>
-            <div class="header-controls">
-                <div class="text-center">
-                    <div id="currentTime" style="font-size: 1.2rem; font-weight: 600;"></div>
-                    <div id="currentDate" style="font-size: 0.9rem; color: var(--muted);"></div>
-                </div>
-                <button id="themeToggle" class="theme-toggle"><i class="fas fa-moon"></i> <span>Dark Mode</span></button>
-            </div>
-        </div>
-    </header>
+        </header>
 
     <div id="attendanceWindowBar" class="alert alert-info hidden" style="text-align: center; font-weight: bold;">
         <i class="alert-icon fas fa-clock"></i>
@@ -87,41 +74,12 @@
     </div>
 
     <div class="row">
-        <div class="col-md-3">
-            <div class="stats-card">
-                <div class="icon" style="color: var(--success);"><i class="fas fa-check-circle"></i></div>
-                <div id="totalPresent" class="number">0</div>
-                <div class="label">Total Present</div>
-            </div>
         </div>
-        <div class="col-md-3">
-            <div class="stats-card">
-                <div class="icon" style="color: var(--danger);"><i class="fas fa-times-circle"></i></div>
-                <div id="totalAbsent" class="number">0</div>
-                <div class="label">Total Absent</div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="stats-card">
-                <div class="icon"><i class="fas fa-calendar-alt"></i></div>
-                <div id="totalClasses" class="number">0</div>
-                <div class="label">Total Classes</div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="stats-card">
-                <div class="icon" style="color: var(--accent);"><i class="fas fa-percentage"></i></div>
-                <div id="attendancePercentage" class="number">0%</div>
-                <div class="label">Percentage</div>
-            </div>
-        </div>
-    </div>
 
     <div class="row">
         <div class="col-md-6">
             <div class="card">
                 <h3 class="card-title">Mark Attendance</h3>
-                <p class="card-subtitle mb-3">Scanning is enabled only during the attendance window.</p>
                 <div id="qrScanner" class="qr-scanner disabled" onclick="scanQR()">
                     <div class="icon"><i class="fas fa-qrcode"></i></div>
                     <p>Tap to Scan</p>
@@ -132,7 +90,6 @@
         <div class="col-md-6">
             <div class="card">
                 <h3 class="card-title">Attendance Calculator</h3>
-                <p class="card-subtitle">See how future attendance affects your percentage.</p>
                 <div class="form-group mt-3">
                     <label for="futureClasses">If I attend the next...</label>
                     <input type="number" id="futureClasses" class="form-control" placeholder="e.g., 5" min="1">
@@ -167,8 +124,7 @@
                 <button id="sectionA" class="section-btn active" onclick="switchSection('A')">Section A</button>
                 <button id="sectionB" class="section-btn" onclick="switchSection('B')">Section B</button>
             </div>
-            <div id="timetableContent" class="timetable-container">
-            </div>
+            <div id="timetableContent" class="timetable-container"></div>
         </div>
 
         <div id="historyTab" class="tab-panel">
@@ -197,7 +153,8 @@
             </div>
         </div>
     </div>
-        </div>
+            </div>
+        
         
 
         <div id="adminDashboard" class="hidden">
