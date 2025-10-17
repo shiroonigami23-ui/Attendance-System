@@ -1,15 +1,14 @@
-// Import the functions you need from the SDKs you need
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 
-// TODO: Add your own Firebase configuration from Step 2
+// Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyCg_pcmS3dU8bH-grlPnYYUy_vwJR9KqSk",
+  authDomain: "my-attendance-app-eb967.firebaseapp.com",
+  projectId: "my-attendance-app-eb967",
+  storageBucket: "my-attendance-app-eb967.appspot.com", // Corrected domain
+  messagingSenderId: "831343304771",
+  appId: "1:831343304771:web:178230fc87c93ba72a74f6"
 };
 
 // Initialize Firebase
@@ -18,3 +17,4 @@ const db = getFirestore(app);
 
 // Export the database connection to use in other files
 export { db };
+
