@@ -13,46 +13,78 @@ export class AdminDashboard {
         await this.loadRegisteredStudents();
     }
 
-    async loadRegisteredStudents() {
-        const devicesSnap = await getDocs(collection(db, "devices"));
-        const students = [];
-        for (const deviceDoc of devicesSnap.docs) {
-            const deviceData = deviceDoc.data();
+    // REPLACE the existing loadRegisteredStudents function
+async loadRegisteredStudents() {
+    console.log("Admin: Fetching registered devices...");
+    const devicesSnap = await getDocs(collection(db, "devices"));
+    const students = [];
+
+    // Use Promise.all for more efficient data fetching
+    const studentPromises = devicesSnap.docs.map(async (deviceDoc) => {
+        const deviceData = deviceDoc.data();
+        if (!deviceData.rollNumber) {
+            console.warn(`Device ${deviceDoc.id} has no rollNumber, skipping.`);
+            return null;
+        }
+
+        try {
             const userSnap = await getDoc(doc(db, "users", deviceData.rollNumber));
             if (userSnap.exists()) {
-                students.push({
+                return {
                     ...userSnap.data(),
                     deviceId: deviceDoc.id,
                     lastLogin: deviceData.lastLogin
-                });
+                };
+            } else {
+                console.warn(`User document not found for roll number: ${deviceData.rollNumber}`);
+                return null;
             }
+        } catch (error) {
+            console.error(`Error fetching user ${deviceData.rollNumber}:`, error);
+            return null;
         }
-        this.registeredStudents = students;
-        this.renderStudentTable();
-        this.updateAdminStats();
+    });
+
+    const resolvedStudents = await Promise.all(studentPromises);
+    // Filter out any null results from skipped or failed fetches
+    this.registeredStudents = resolvedStudents.filter(student => student !== null);
+    
+    console.log(`Found ${this.registeredStudents.length} registered students.`);
+    this.renderStudentTable();
+    this.updateAdminStats();
+}
+
+// REPLACE the existing renderStudentTable function
+renderStudentTable() {
+    const tbody = document.getElementById('studentTableBody');
+    tbody.innerHTML = ''; // Clear existing rows
+
+    if (this.registeredStudents.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center;">No registered students found. Click Refresh to check again.</td></tr>`;
+        return;
     }
 
-    renderStudentTable() {
-        const tbody = document.getElementById('studentTableBody');
-        tbody.innerHTML = '';
-        this.registeredStudents.forEach(student => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${student.rollNumber}</td>
-                <td>${student.username}</td>
-                <td>${student.section}</td>
-                <td>${student.deviceId.substring(0, 15)}...</td>
-                <td>${new Date(student.lastLogin).toLocaleString()}</td>
-                <td><span class="status-badge status-present">Active</span></td>
-                <td>
-                    <button class="btn btn-sm btn-danger" onclick="window.app.adminDashboard.forceLogoutStudent('${student.deviceId}')">
-                        <i class="fas fa-sign-out-alt"></i>
-                    </button>
-                </td>
-            `;
-            tbody.appendChild(row);
-        });
-    }
+    this.registeredStudents.forEach(student => {
+        const row = document.createElement('tr');
+        const lastLoginDate = student.lastLogin ? new Date(student.lastLogin).toLocaleString() : 'N/A';
+        
+        row.innerHTML = `
+            <td>${student.rollNumber || 'N/A'}</td>
+            <td>${student.username || 'N/A'}</td>
+            <td>${student.section || 'N/A'}</td>
+            <td>${student.deviceId.substring(0, 15)}...</td>
+            <td>${lastLoginDate}</td>
+            <td><span class="status-badge status-present">Active</span></td>
+            <td>
+                <button class="btn btn-sm btn-danger" onclick="window.app.adminDashboard.forceLogoutStudent('${student.deviceId}')">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+    
 
     updateAdminStats() {
         document.getElementById('totalStudents').textContent = this.registeredStudents.length;
