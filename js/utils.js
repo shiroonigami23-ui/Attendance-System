@@ -5,22 +5,32 @@ export class ConfigManager {
         this.config = null;
     }
 
+
     async loadConfig() {
         try {
             const response = await fetch('config.xml');
             if (!response.ok) {
-                throw new Error(`Failed to fetch config.xml: ${response.statusText}`);
+                // This will now throw a user-visible error
+                throw new Error(`Could not find or load config.xml. Please ensure it is in the root project folder.`);
             }
             const xmlText = await response.text();
             const parser = new DOMParser();
             const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+            
+            // Check if parsing failed
+            if (xmlDoc.getElementsByTagName('parsererror').length) {
+                throw new Error('Error parsing config.xml. Check the file for syntax errors.');
+            }
+            
             this.config = this.parseXMLConfig(xmlDoc);
         } catch (error) {
-            console.error('Error loading config:', error);
-            // In a real app, you might want a more robust fallback.
-            this.config = {};
+            console.error('CRITICAL ERROR:', error);
+            // Show a visible alert to the user
+            Utils.showAlert(error.message, 'danger', 0); // duration 0 means it stays until closed
+            this.config = {}; // Fallback to empty config
         }
     }
+
 
     parseXMLConfig(xmlDoc) {
         const config = {};
