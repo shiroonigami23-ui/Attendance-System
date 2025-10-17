@@ -108,6 +108,10 @@ window.changeCalendarMonth = (direction) => {
     window.app.studentDashboard.changeMonth(direction);
 };
 
+window.showDayDetails = (dateStr) => {
+    window.app.studentDashboard.showAttendanceForDay(dateStr);
+};
+
 window.adminLogout = () => {
     window.app.authManager.logout();
     window.app.showUI(null);
