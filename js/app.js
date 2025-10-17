@@ -1,5 +1,3 @@
-// js/app.js
-
 import { ConfigManager, Utils } from './utils.js';
 import { AuthManager } from './auth.js';
 import { StudentDashboard } from './student.js';
@@ -26,7 +24,6 @@ class AttendanceSystem {
     }
 
     showUI(user) {
-        // Hide all containers first
         document.getElementById('authContainer').classList.add('hidden');
         document.getElementById('studentDashboard').classList.add('hidden');
         document.getElementById('adminDashboard').classList.add('hidden');
@@ -60,7 +57,6 @@ class AttendanceSystem {
             const user = await this.authManager.loginStudent(rollNumber, username, password, section);
             if (user) this.showUI(user);
         });
-
         document.getElementById('adminAuthForm').addEventListener('submit', (e) => {
             e.preventDefault();
             const username = document.getElementById('adminUsername').value;
@@ -68,13 +64,11 @@ class AttendanceSystem {
             const user = this.authManager.loginAdmin(username, password);
             if (user) this.showUI(user);
         });
-        
         document.getElementById('themeToggle').addEventListener('click', () => Utils.toggleTheme());
         document.getElementById('adminThemeToggle').addEventListener('click', () => Utils.toggleTheme());
     }
 }
 
-// Make app instance and its methods available globally for HTML onclicks
 window.app = new AttendanceSystem();
 
 // --- Global Functions for HTML ---
@@ -90,12 +84,10 @@ window.switchDashboardTab = (tabId) => {
     document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
     document.getElementById(`${tabId}Tab`).classList.add('active');
     document.querySelector(`[onclick="switchDashboardTab('${tabId}')"]`).classList.add('active');
-
     if (tabId === 'timetable') {
         window.app.studentDashboard.renderTimetable();
     }
 };
-
 
 window.switchAdminTab = (tabId) => {
     document.querySelectorAll('.tab-panel').forEach(el => el.classList.remove('active'));
@@ -104,9 +96,7 @@ window.switchAdminTab = (tabId) => {
     document.querySelector(`[onclick="switchAdminTab('${tabId}')"]`).classList.add('active');
 };
 
-window.changeCalendarMonth = (direction) => {
-    window.app.studentDashboard.changeMonth(direction);
-};
+window.changeCalendarMonth = (direction) => window.app.studentDashboard.changeMonth(direction);
 
 window.showDayDetails = (dateStr) => {
     window.app.studentDashboard.showAttendanceForDay(dateStr);
@@ -118,20 +108,15 @@ window.adminLogout = () => {
 };
 
 window.scanQR = () => {
-    // A real QR scanner would use the camera. We will simulate a successful scan.
     Utils.showAlert("Simulating QR scan...", "info", 2000);
-    setTimeout(() => {
-        window.app.studentDashboard.markAttendance();
-    }, 1500);
+    setTimeout(() => { window.app.studentDashboard.markAttendance(); }, 1500);
 };
 
 window.switchSection = (sectionId) => window.app.studentDashboard.switchSection(sectionId);
 window.markManualAttendance = () => window.app.adminDashboard.markManualAttendance();
 window.clearDeviceData = () => window.app.adminDashboard.clearAllDeviceData();
-window.refreshAdminData = () => {Utils.showAlert("Refreshing student list...", "info", 2000);
-    window.app.adminDashboard.loadRegisteredStudents();
-};
-// Initialize the application
+window.refreshAdminData = () => window.app.adminDashboard.loadRegisteredStudents();
+
 document.addEventListener('DOMContentLoaded', () => {
     window.app.init();
 });
