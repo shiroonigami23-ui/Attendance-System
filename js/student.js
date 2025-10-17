@@ -15,7 +15,7 @@ export class StudentDashboard {
         this.currentUser = null;
         this.currentSection = 'A';
         this.attendanceHistory = {};
-        this.calendarDisplayDate = new Date(); // State for calendar navigation
+        this.calendarDisplayDate = new Date();
     }
 
     async init(userData) {
@@ -24,7 +24,7 @@ export class StudentDashboard {
         this.calendarDisplayDate = new Date();
 
         this.renderHeader();
-        this.updateCurrentAndNextClass(); // Display current class info
+        this.updateCurrentAndNextClass();
 
         await this.fetchAttendanceHistory();
         this.updateAttendanceStats();
