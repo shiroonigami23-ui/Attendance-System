@@ -115,7 +115,9 @@ window.scanQR = () => {
 window.switchSection = (sectionId) => window.app.studentDashboard.switchSection(sectionId);
 window.markManualAttendance = () => window.app.adminDashboard.markManualAttendance();
 window.clearDeviceData = () => window.app.adminDashboard.clearAllDeviceData();
-
+window.refreshAdminData = () => {Utils.showAlert("Refreshing student list...", "info", 2000);
+    window.app.adminDashboard.loadRegisteredStudents();
+};
 // Initialize the application
 document.addEventListener('DOMContentLoaded', () => {
     window.app.init();
