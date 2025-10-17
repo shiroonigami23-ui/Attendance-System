@@ -1,18 +1,297 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" data-theme="light">
+
 <head>
-  <title>Attendance System</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="script.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Campus Attendance System</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
+
 <body>
-  <!-- Optionally use JS to fetch and display XML content -->
-  <script>
-    fetch('index.xml')
-      .then(response => response.text())
-      .then(str => {
-        document.body.innerHTML += `<pre>${str}</pre>`;
-      });
-  </script>
+    <div class="container">
+        <div id="notificationContainer" class="notification-container"></div>
+        <div id="alertContainer"></div>
+
+        <div id="authContainer">
+            <div class="card" style="max-width: 500px; margin: 40px auto;">
+                <div class="card-header text-center">
+                    <h1 style="color: var(--primary);">Attendance System</h1>
+                    <p>Please log in to continue</p>
+                </div>
+                <div class="tabs">
+                    <button class="tab active" onclick="switchTab('studentLogin')"><i class="fas fa-user-graduate"></i> Student</button>
+                    <button class="tab" onclick="switchTab('adminLogin')"><i class="fas fa-user-shield"></i> Admin</button>
+                </div>
+                <div id="studentLoginTab" class="tab-content active">
+                    <form id="studentAuthForm">
+                        <div class="form-group">
+                            <label for="rollNumber">Roll Number</label>
+                            <input type="text" id="rollNumber" class="form-control" placeholder="e.g., 0902CS231001" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="studentSection">Section</label>
+                            <select id="studentSection" class="form-select" required>
+                                <option value="A">Section A</option>
+                                <option value="B">Section B</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="studentUsername">Username</label>
+                            <input type="text" id="studentUsername" class="form-control" placeholder="Enter your name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="studentPassword">Password</label>
+                            <input type="password" id="studentPassword" class="form-control" placeholder="Enter a password" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Login / Register</button>
+                    </form>
+                </div>
+                <div id="adminLoginTab" class="tab-content">
+                    <form id="adminAuthForm">
+                        <div class="form-group">
+                            <label for="adminUsername">Admin Username</label>
+                            <input type="text" id="adminUsername" class="form-control" placeholder="admin" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="adminPassword">Admin Password</label>
+                            <input type="password" id="adminPassword" class="form-control" placeholder="••••••••" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Admin Login</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div id="studentDashboard" class="hidden">
+            <header class="header">
+                <div class="header-content">
+                    <div>
+                        <h1><span id="userAvatar" class="user-avatar">S</span> <span id="userName">Student Name</span></h1>
+                        <p><span id="userRoll">Roll Number</span> | <span id="userSection">Section</span></p>
+                    </div>
+                    <div class="header-controls">
+                        <div class="text-center">
+                            <div id="currentTime" style="font-size: 1.2rem; font-weight: 600;"></div>
+                            <div id="currentDate" style="font-size: 0.9rem; color: var(--muted);"></div>
+                        </div>
+                        <button id="themeToggle" class="theme-toggle"><i class="fas fa-moon"></i> <span>Dark Mode</span></button>
+                    </div>
+                </div>
+            </header>
+
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="stats-card">
+                        <div class="icon" style="color: var(--success);"><i class="fas fa-check-circle"></i></div>
+                        <div id="totalPresent" class="number">0</div>
+                        <div class="label">Total Present</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stats-card">
+                        <div class="icon" style="color: var(--danger);"><i class="fas fa-times-circle"></i></div>
+                        <div id="totalAbsent" class="number">0</div>
+                        <div class="label">Total Absent</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stats-card">
+                        <div class="icon"><i class="fas fa-calendar-alt"></i></div>
+                        <div id="totalClasses" class="number">0</div>
+                        <div class="label">Total Classes</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stats-card">
+                        <div class="icon" style="color: var(--accent);"><i class="fas fa-percentage"></i></div>
+                        <div id="attendancePercentage" class="number">0%</div>
+                        <div class="label">Percentage</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="nav-tabs">
+                    <button class="nav-tab active" onclick="switchDashboardTab('dashboard')">Dashboard</button>
+                    <button class="nav-tab" onclick="switchDashboardTab('timetable')">Timetable</button>
+                    <button class="nav-tab" onclick="switchDashboardTab('history')">History</button>
+                </div>
+
+                <div id="dashboardTab" class="tab-panel active">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <h3 class="card-title">Mark Attendance</h3>
+                                <p class="card-subtitle mb-3">Scan the QR code shown in class to mark your attendance.</p>
+                                <div id="qrScanner" class="qr-scanner" onclick="scanQR()">
+                                    <div class="icon"><i class="fas fa-qrcode"></i></div>
+                                    <p>Tap to Scan QR Code</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <h3 class="card-title">Current Class</h3>
+                                <div id="currentClass">-</div>
+                            </div>
+                            <div class="card mt-3">
+                                <h3 class="card-title">Next Class</h3>
+                                <div id="nextClass">-</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="timetableTab" class="tab-panel">
+                     <div class="section-buttons">
+                        <button id="sectionA" class="section-btn active" onclick="switchSection('A')">Section A</button>
+                        <button id="sectionB" class="section-btn" onclick="switchSection('B')">Section B</button>
+                    </div>
+                    <div id="timetableContent" class="timetable-container"></div>
+                </div>
+
+                <div id="historyTab" class="tab-panel">
+                    <div class="row">
+                        <div class="col-md-5">
+                            <h3 class="card-title">Attendance Calendar</h3>
+                            <div id="attendanceCalendar" class="calendar-grid"></div>
+                        </div>
+                        <div class="col-md-7">
+                             <h3 class="card-title">Subject-wise Attendance</h3>
+                             <div class="table-responsive">
+                                 <table class="table">
+                                     <thead>
+                                         <tr><th>Subject</th><th>Present</th><th>Total</th><th>Percentage</th></tr>
+                                     </thead>
+                                     <tbody id="subjectAttendanceTable"></tbody>
+                                 </table>
+                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="adminDashboard" class="hidden">
+             <header class="header">
+                <div class="header-content">
+                    <div><h1><i class="fas fa-user-shield" style="color:var(--primary)"></i> Admin Dashboard</h1></div>
+                    <div class="header-controls">
+                         <button id="adminThemeToggle" class="theme-toggle"><i class="fas fa-moon"></i> <span>Dark Mode</span></button>
+                         <button class="btn btn-danger" onclick="adminLogout()">Logout</button>
+                    </div>
+                </div>
+            </header>
+            
+            <div class="row">
+                <div class="col-md-3"><div class="stats-card"><div class="icon"><i class="fas fa-users"></i></div><div id="totalStudents" class="number">0</div><div class="label">Total Students</div></div></div>
+                <div class="col-md-3"><div class="stats-card"><div class="icon" style="color: var(--success);"><i class="fas fa-user-check"></i></div><div id="activeStudents" class="number">0</div><div class="label">Active Students</div></div></div>
+                <div class="col-md-3"><div class="stats-card"><div class="icon"><i class="fas fa-mobile-alt"></i></div><div id="totalDevices" class="number">0</div><div class="label">Registered Devices</div></div></div>
+                <div class="col-md-3"><div class="stats-card"><div class="icon" style="color: var(--accent);"><i class="fas fa-server"></i></div><div id="systemStatus" class="number">Operational</div><div class="label">System Status</div></div></div>
+            </div>
+            
+            <div class="card">
+                 <div class="nav-tabs">
+                    <button class="nav-tab active" onclick="switchAdminTab('students')">Students</button>
+                    <button class="nav-tab" onclick="switchAdminTab('attendance')">Attendance</button>
+                    <button class="nav-tab" onclick="switchAdminTab('reports')">Reports</button>
+                    <button class="nav-tab" onclick="switchAdminTab('settings')">Settings</button>
+                </div>
+
+                <div id="adminStudentsTab" class="tab-panel active">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h3 class="card-title">Registered Students</h3>
+                        <button class="btn btn-secondary" onclick="exportStudentData()"><i class="fas fa-file-csv"></i> Export CSV</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr><th>Roll No</th><th>Name</th><th>Section</th><th>Device ID</th><th>Registered</th><th>Last Login</th><th>Status</th><th>Actions</th></tr>
+                            </thead>
+                            <tbody id="studentTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                 <div id="adminAttendanceTab" class="tab-panel">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h3 class="card-title">Generate QR Code</h3>
+                            <p class="card-subtitle">Generate a temporary QR code for a class.</p>
+                            <div class="form-group">
+                                <label>Select Class</label>
+                                <select id="classSelector" class="form-select">
+                                    <option value="CS501 - Theory">CS501 - Theory</option>
+                                    <option value="CS505 - Lab">CS505 - Lab</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-success" onclick="generateQRCode()"><i class="fas fa-qrcode"></i> Generate QR</button>
+                            <div id="qrCodeDisplay" class="mt-3"></div>
+                        </div>
+                        <div class="col-md-6">
+                            <h3 class="card-title">Manual Attendance</h3>
+                            <p class="card-subtitle">Mark attendance for a student manually.</p>
+                            <div class="form-group">
+                                <label>Roll Number</label>
+                                <input type="text" id="manualRollNumber" class="form-control" placeholder="Student Roll Number">
+                            </div>
+                            <div class="form-group">
+                                <label>Status</label>
+                                <select id="attendanceStatus" class="form-select">
+                                    <option value="present">Present</option>
+                                    <option value="absent">Absent</option>
+                                    <option value="late">Late</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-primary" onclick="markManualAttendance()">Submit Attendance</button>
+                        </div>
+                    </div>
+                </div>
+
+                 <div id="adminReportsTab" class="tab-panel">
+                     <h3 class="card-title">Generate Reports</h3>
+                    <div class="form-group">
+                        <label>Report Type</label>
+                        <select id="reportType" class="form-select">
+                            <option value="daily">Daily Attendance Report</option>
+                            <option value="weekly">Weekly Summary</option>
+                            <option value="monthly">Monthly Defaulter List</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Date</label>
+                        <input type="date" id="reportDate" class="form-control">
+                    </div>
+                    <button class="btn btn-info" onclick="generateClassReport()"><i class="fas fa-chart-bar"></i> Generate Report</button>
+                </div>
+
+                <div id="adminSettingsTab" class="tab-panel">
+                    <h3 class="card-title">System Settings</h3>
+                    <div class="alert alert-warning">
+                        <i class="alert-icon fas fa-exclamation-triangle"></i>
+                        <span>Warning: These actions are irreversible and affect all users.</span>
+                    </div>
+                    <div class="d-flex gap-3 flex-wrap">
+                        <button class="btn btn-danger" onclick="bulkLogout()"><i class="fas fa-sign-out-alt"></i> Bulk Logout All Students</button>
+                        <button class="btn btn-danger" onclick="clearDeviceData()"><i class="fas fa-trash"></i> Clear All Device Data</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="deviceWarning" class="device-warning hidden">
+             <div class="icon"><i class="fas fa-exclamation-triangle"></i></div>
+             <h2>Device Mismatch</h2>
+             <p>This device is already registered with another student.</p>
+             <p>Please log in from your original registered device or contact the system administrator to reset your device registration.</p>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    
+    <script type="module" src="js/app.js"></script>
 </body>
 </html>
