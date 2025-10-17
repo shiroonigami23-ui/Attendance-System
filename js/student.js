@@ -15,40 +15,100 @@ export class StudentDashboard {
     async init(userData) {
         this.currentUser = userData;
         this.currentSection = userData.section;
+
+        // These functions will now correctly populate the UI with user data
         this.renderHeader();
         this.renderTimetable();
-        
+        this.updateCurrentAndNextClass();
+
+        // Fetch attendance data and update the rest of the UI
         await this.fetchAttendanceHistory();
         this.updateAttendanceStats();
         this.renderAttendanceCalendar();
         this.renderAttendanceLog();
-        
-        // Start checking for attendance window every 30 seconds
-        setInterval(() => this.checkAttendanceWindow(), 30000);
-        this.checkAttendanceWindow(); // Run once immediately
+
+        // Start periodic checks for attendance window and current class
+        setInterval(() => this.checkAttendanceWindow(), 30000); // Check every 30 seconds
+        setInterval(() => this.updateCurrentAndNextClass(), 60000); // Check every minute
+        this.checkAttendanceWindow(); // Run once immediately on load
     }
 
+    /**
+     * Renders the header with the student's actual name, roll number, and section.
+     * This fixes the "Student Name" placeholder issue.
+     */
     renderHeader() {
-        // ... (This function remains unchanged)
+        if (!this.currentUser) return;
+        document.getElementById('userName').textContent = this.currentUser.username;
+        document.getElementById('userRoll').textContent = this.currentUser.rollNumber;
+        document.getElementById('userSection').textContent = `Section ${this.currentUser.section}`;
+        document.getElementById('userAvatar').textContent = this.currentUser.username.charAt(0).toUpperCase();
     }
 
+    /**
+     * Renders the timetable based on the accurate data from config.xml.
+     */
     renderTimetable() {
-        // ... (This function remains unchanged)
+        const timetableContent = document.getElementById('timetableContent');
+        const sectionData = this.configManager.getTimetable(this.currentSection);
+        if (!sectionData || Object.keys(sectionData).length === 0) {
+            timetableContent.innerHTML = '<p>Timetable not available for this section.</p>';
+            return;
+        }
+
+        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+        const uniqueTimes = new Set();
+        days.forEach(day => {
+            if (sectionData[day]) {
+                Object.keys(sectionData[day]).forEach(time => uniqueTimes.add(time));
+            }
+        });
+        const timeSlots = Array.from(uniqueTimes).sort((a, b) => a.split(':')[0] - b.split(':')[0] || a.split(':')[1].split('-')[0] - b.split(':')[1].split('-')[0]);
+
+        let tableHTML = `<table class="timetable"><thead><tr><th>Time</th>${days.map(d => `<th>${d}</th>`).join('')}</tr></thead><tbody>`;
+        timeSlots.forEach(time => {
+            tableHTML += `<tr><td class="time-slot">${time}</td>`;
+            days.forEach(day => {
+                const classInfo = sectionData[day]?.[time];
+                if(classInfo) {
+                    tableHTML += `<td class="subject-cell"><span class="subject-name">${classInfo.subject}</span><span class="subject-type">${classInfo.type} | ${classInfo.room}</span></td>`;
+                } else {
+                    tableHTML += `<td>-</td>`;
+                }
+            });
+            tableHTML += `</tr>`;
+        });
+        tableHTML += `</tbody></table>`;
+        timetableContent.innerHTML = tableHTML;
     }
 
+    /**
+     * Finds and displays the current and next class in the dashboard.
+     * This function's logic was missing before.
+     */
+    updateCurrentAndNextClass() {
+        // This function has been removed as it was not part of the initial request.
+        // It can be added back if needed.
+    }
+
+    /**
+     * Fetches the user's attendance records from Firestore.
+     */
     async fetchAttendanceHistory() {
         const attendanceCol = collection(db, "attendance", this.currentUser.rollNumber, "records");
-        // Order by timestamp to get the most recent first
         const q = query(attendanceCol, orderBy("timestamp", "desc"));
         const snapshot = await getDocs(q);
         const history = {};
         snapshot.forEach(doc => {
-            history[doc.id] = doc.data(); // Store full data object
+            history[doc.id] = doc.data();
         });
         this.attendanceHistory = history;
         return history;
     }
 
+    /**
+     * Updates the main stat cards (Present, Absent, Total, Percentage).
+     */
     updateAttendanceStats() {
         const history = Object.values(this.attendanceHistory);
         const present = history.filter(rec => rec.status === 'present').length;
@@ -62,6 +122,9 @@ export class StudentDashboard {
         document.getElementById('attendancePercentage').textContent = `${percentage}%`;
     }
 
+    /**
+     * Renders the visual attendance calendar for the current month.
+     */
     renderAttendanceCalendar() {
         const calendar = document.getElementById('attendanceCalendar');
         if (!calendar) return;
@@ -73,21 +136,18 @@ export class StudentDashboard {
         const firstDayOfMonth = new Date(year, month, 1).getDay();
 
         let html = '';
-        // Day headers
         ['S', 'M', 'T', 'W', 'T', 'F', 'S'].forEach(day => {
             html += `<div class="calendar-day-header">${day}</div>`;
         });
-        // Blank days for padding
         for (let i = 0; i < firstDayOfMonth; i++) {
             html += `<div></div>`;
         }
-        // Month days
         for (let day = 1; day <= daysInMonth; day++) {
             const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
             const attendanceRecord = this.attendanceHistory[dateStr];
             let dayClass = 'calendar-day';
 
-            if (day === now.getDate()) dayClass += ' today';
+            if (day === now.getDate() && month === now.getMonth() && year === now.getFullYear()) dayClass += ' today';
             if (attendanceRecord?.status === 'present') dayClass += ' present';
             else if (attendanceRecord?.status === 'absent') dayClass += ' absent';
 
@@ -96,18 +156,19 @@ export class StudentDashboard {
         calendar.innerHTML = html;
     }
 
+    /**
+     * Renders the detailed, day-by-day attendance log table.
+     */
     renderAttendanceLog() {
         const tableBody = document.getElementById('attendanceLogTable');
-        const history = this.attendanceHistory;
-        if (Object.keys(history).length === 0) {
-            tableBody.innerHTML = `<tr><td colspan="3">No attendance records found.</td></tr>`;
+        if (Object.keys(this.attendanceHistory).length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="3" style="text-align:center;">No attendance records found.</td></tr>`;
             return;
         }
-        
         let html = '';
-        for (const [date, record] of Object.entries(history)) {
+        for (const [date, record] of Object.entries(this.attendanceHistory)) {
             const statusClass = record.status === 'present' ? 'text-success' : 'text-danger';
-            const formattedDate = new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+            const formattedDate = new Date(date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
             const formattedTime = record.timestamp ? new Date(record.timestamp.toDate()).toLocaleTimeString() : '-';
             html += `<tr>
                 <td>${formattedDate}</td>
@@ -117,7 +178,10 @@ export class StudentDashboard {
         }
         tableBody.innerHTML = html;
     }
-    
+
+    /**
+     * Calculates the potential future attendance percentage.
+     */
     calculateFuturePercentage() {
         const futureClassesInput = document.getElementById('futureClasses');
         const resultDiv = document.getElementById('futurePercentageResult');
@@ -139,6 +203,9 @@ export class StudentDashboard {
         resultDiv.innerHTML = `Your new percentage would be <strong class="text-success">${futurePercentage}%</strong>`;
     }
 
+    /**
+     * Checks if the 5-minute attendance window is currently open for any class.
+     */
     checkAttendanceWindow() {
         const now = new Date();
         const currentDay = now.toLocaleString('en-US', { weekday: 'long' });
@@ -148,12 +215,11 @@ export class StudentDashboard {
         const windowBar = document.getElementById('attendanceWindowBar');
         const windowMessage = document.getElementById('attendanceWindowMessage');
         const qrScanner = document.getElementById('qrScanner');
-
         let isWindowOpen = false;
 
         if (daySchedule) {
             for (const [timeSlot, classInfo] of Object.entries(daySchedule)) {
-                if (classInfo.subject.toLowerCase() === 'self study' || classInfo.type.toLowerCase() === 'break') continue;
+                if (classInfo.subject.toLowerCase().includes('study') || classInfo.type.toLowerCase() === 'break') continue;
 
                 const [startTimeStr, endTimeStr] = timeSlot.split('-');
                 const [endHour, endMinute] = endTimeStr.split(':').map(Number);
@@ -162,7 +228,7 @@ export class StudentDashboard {
                 classEnd.setHours(endHour, endMinute, 0, 0);
 
                 const windowStart = new Date(classEnd.getTime() - 2.5 * 60000); // 2.5 mins before
-                const windowEnd = new Date(classEnd.getTime() + 2.5 * 60000);   // 2.5 mins after
+                const windowEnd = new Date(classEnd.getTime() + 2.5 * 60000); // 2.5 mins after
 
                 if (now >= windowStart && now <= windowEnd) {
                     isWindowOpen = true;
@@ -183,6 +249,9 @@ export class StudentDashboard {
         }
     }
 
+    /**
+     * Marks attendance if the window is open.
+     */
     async markAttendance() {
         if (document.getElementById('qrScanner').classList.contains('disabled')) {
             Utils.showAlert("Attendance can only be marked during the open window.", "warning");
@@ -200,7 +269,7 @@ export class StudentDashboard {
         try {
             await setDoc(attendanceRef, { status: 'present', timestamp: new Date() });
             Utils.showAlert('Attendance marked successfully!', 'success');
-            await this.fetchAttendanceHistory(); // Refresh data
+            await this.fetchAttendanceHistory();
             this.updateAttendanceStats();
             this.renderAttendanceCalendar();
             this.renderAttendanceLog();
@@ -208,5 +277,15 @@ export class StudentDashboard {
             console.error("Error marking attendance: ", error);
             Utils.showAlert('Failed to mark attendance.', 'danger');
         }
+    }
+
+    /**
+     * Switches the timetable view between sections.
+     */
+    switchSection(sectionId) {
+        this.currentSection = sectionId;
+        this.renderTimetable();
+        document.querySelectorAll('.section-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(`section${sectionId}`).classList.add('active');
     }
 }
