@@ -209,20 +209,27 @@
                     <button class="nav-tab" onclick="switchAdminTab('settings')">Settings</button>
                 </div>
 
-                <div id="adminStudentsTab" class="tab-panel active">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h3 class="card-title">Registered Students</h3>
-                        <button class="btn btn-secondary" onclick="exportStudentData()"><i class="fas fa-file-csv"></i> Export CSV</button>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="table">
-                            <thead>
-                                <tr><th>Roll No</th><th>Name</th><th>Section</th><th>Device ID</th><th>Last Login</th><th>Status</th><th>Actions</th></tr>
-                            </thead>
-                            <tbody id="studentTableBody"></tbody>
-                        </table>
-                    </div>
-                </div>
+<div id="adminStudentsTab" class="tab-panel active">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3 class="card-title">Registered Students</h3>
+        <div> <button class="btn btn-primary" onclick="refreshAdminData()">
+                <i class="fas fa-sync-alt"></i> Refresh
+            </button>
+            
+            <button class="btn btn-secondary" onclick="exportStudentData()">
+                <i class="fas fa-file-csv"></i> Export CSV
+            </button>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr><th>Roll No</th><th>Name</th><th>Section</th><th>Device ID</th><th>Last Login</th><th>Status</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="studentTableBody"></tbody>
+        </table>
+    </div>
+</div>
 
                  <div id="adminAttendanceTab" class="tab-panel">
                     <div class="row">
