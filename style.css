@@ -970,3 +970,19 @@ body {
 .text-danger {
     color: var(--danger);
 }
+/* --- Additions for Calendar Features --- */
+
+.calendar-day.weekend {
+    background: rgba(113, 128, 150, 0.05);
+    color: var(--muted);
+}
+
+.calendar-day.holiday {
+    background: rgba(159, 122, 234, 0.15); /* Accent color */
+    border: 1px solid var(--accent);
+    font-weight: bold;
+}
+
+.calendar-day.holiday:hover {
+    background: rgba(159, 122, 234, 0.3);
+}
