@@ -8,16 +8,16 @@ export class StudentDashboard {
         this.currentUser = null;
         this.currentSection = 'A';
         this.attendanceHistory = {};
-        this.calendarDisplayDate = new Date(); // State for calendar navigation
+        this.calendarDisplayDate = new Date();
     }
 
     async init(userData) {
         this.currentUser = userData;
         this.currentSection = userData.section;
-        this.calendarDisplayDate = new Date(); // Reset calendar to current month on login
+        this.calendarDisplayDate = new Date();
 
         this.renderHeader();
-        this.updateCurrentAndNextClass(); // Display current class info
+        this.updateCurrentAndNextClass();
 
         await this.fetchAttendanceHistory();
         this.updateAttendanceStats();
@@ -25,15 +25,11 @@ export class StudentDashboard {
         this.renderSubjectAttendance();
         this.renderAttendanceCalendar();
 
-        // Set up periodic checks
         setInterval(() => this.checkAttendanceWindow(), 30000);
         setInterval(() => this.updateCurrentAndNextClass(), 60000);
         this.checkAttendanceWindow();
     }
 
-    /**
-     * Renders the header with the student's actual name, roll number, and section.
-     */
     renderHeader() {
         if (!this.currentUser) return;
         document.getElementById('userName').textContent = this.currentUser.username;
@@ -42,14 +38,11 @@ export class StudentDashboard {
         document.getElementById('userAvatar').textContent = this.currentUser.username.charAt(0).toUpperCase();
     }
 
-    /**
-     * Renders the timetable based on the accurate data from config.xml.
-     */
     renderTimetable() {
         const timetableContent = document.getElementById('timetableContent');
         const sectionData = this.configManager.getTimetable(this.currentSection);
         if (!sectionData || Object.keys(sectionData).length === 0) {
-            timetableContent.innerHTML = '<p>Timetable not available for this section.</p>';
+            timetableContent.innerHTML = '<p>Timetable not available.</p>';
             return;
         }
 
@@ -79,16 +72,64 @@ export class StudentDashboard {
         timetableContent.innerHTML = tableHTML;
     }
 
-    /**
-     * Finds and displays the current and next class in the dashboard.
-     */
     updateCurrentAndNextClass() {
-        // This function has been removed as per your request to have a cleaner student.js file
+        const currentClassEl = document.getElementById('currentClass');
+        const nextClassEl = document.getElementById('nextClass');
+        if (!currentClassEl || !nextClassEl) return;
+
+        const now = new Date();
+        const currentDay = now.toLocaleString('en-US', { weekday: 'long' });
+        const timetable = this.configManager.getTimetable(this.currentUser.section);
+        const daySchedule = timetable?.[currentDay];
+
+        if (!daySchedule) {
+            currentClassEl.innerHTML = '<h5>Current Class</h5><p>No classes scheduled today.</p>';
+            nextClassEl.innerHTML = '<h5>Next Class</h5><p>Enjoy your day off!</p>';
+            return;
+        }
+
+        let currentClass = null;
+        let nextClass = null;
+        const sortedSlots = Object.keys(daySchedule).sort();
+
+        for (let i = 0; i < sortedSlots.length; i++) {
+            const timeSlot = sortedSlots[i];
+            const [startTimeStr, endTimeStr] = timeSlot.split('-');
+            const [startHour, startMinute] = startTimeStr.split(':').map(Number);
+            const [endHour, endMinute] = endTimeStr.split(':').map(Number);
+
+            const classStart = new Date();
+            classStart.setHours(startHour, startMinute, 0, 0);
+            const classEnd = new Date();
+            classEnd.setHours(endHour, endMinute, 0, 0);
+
+            if (now >= classStart && now <= classEnd) {
+                currentClass = { ...daySchedule[timeSlot], timeSlot };
+                if (i + 1 < sortedSlots.length) {
+                    const nextTimeSlot = sortedSlots[i+1];
+                    nextClass = { ...daySchedule[nextTimeSlot], timeSlot: nextTimeSlot };
+                }
+                break;
+            } else if (now < classStart) {
+                if (!nextClass) {
+                   nextClass = { ...daySchedule[timeSlot], timeSlot };
+                }
+            }
+        }
+        
+        if (currentClass) {
+            currentClassEl.innerHTML = `<h5>Current Class</h5><strong>${currentClass.subject}</strong><p><i class="fas fa-clock"></i> ${currentClass.timeSlot} | <i class="fas fa-map-marker-alt"></i> ${currentClass.room}</p>`;
+        } else {
+            currentClassEl.innerHTML = '<h5>Current Class</h5><p>No class right now.</p>';
+        }
+
+        if (nextClass) {
+            nextClassEl.innerHTML = `<h5>Next Class</h5><strong>${nextClass.subject}</strong><p><i class="fas fa-clock"></i> ${nextClass.timeSlot} | <i class="fas fa-map-marker-alt"></i> ${nextClass.room}</p>`;
+        } else {
+            nextClassEl.innerHTML = '<h5>Next Class</h5><p>No more classes today.</p>';
+        }
     }
 
-    /**
-     * Fetches the user's attendance records from Firestore.
-     */
     async fetchAttendanceHistory() {
         const attendanceCol = collection(db, "attendance", this.currentUser.rollNumber, "records");
         const q = query(attendanceCol, orderBy("timestamp", "desc"));
@@ -101,9 +142,6 @@ export class StudentDashboard {
         return history;
     }
 
-    /**
-     * Updates the main stat cards (Present, Absent, Total, Percentage).
-     */
     updateAttendanceStats() {
         const history = Object.values(this.attendanceHistory);
         const present = history.filter(rec => rec.status === 'present').length;
@@ -117,19 +155,16 @@ export class StudentDashboard {
         document.getElementById('attendancePercentage').textContent = `${percentage}%`;
     }
 
-    /**
-     * Renders the detailed, day-by-day attendance log table.
-     */
     renderAttendanceLog() {
         const tableBody = document.getElementById('attendanceLogTable');
         if (Object.keys(this.attendanceHistory).length === 0) {
-            tableBody.innerHTML = `<tr><td colspan="3" style="text-align:center;">No attendance records found.</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="3" style="text-align:center;">No records found.</td></tr>`;
             return;
         }
         let html = '';
         for (const [date, record] of Object.entries(this.attendanceHistory)) {
             const statusClass = record.status === 'present' ? 'text-success' : 'text-danger';
-            const formattedDate = new Date(date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+            const formattedDate = new Date(date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
             const formattedTime = record.timestamp ? new Date(record.timestamp.toDate()).toLocaleTimeString() : '-';
             html += `<tr>
                 <td>${formattedDate}</td>
@@ -140,16 +175,13 @@ export class StudentDashboard {
         tableBody.innerHTML = html;
     }
 
-    /**
-     * Simulates subject-wise attendance and renders it to the dashboard table.
-     */
     renderSubjectAttendance() {
         const subjectStats = this.calculateSubjectAttendance();
         const dashboardTbody = document.getElementById('subjectAttendanceTableDashboard');
         let tableHTML = '';
 
         if (Object.keys(subjectStats).length === 0) {
-            tableHTML = `<tr><td colspan="4">No attendance data to calculate.</td></tr>`;
+            tableHTML = `<tr><td colspan="4">No data to calculate.</td></tr>`;
         } else {
             for (const subject in subjectStats) {
                 const { attended, total, percentage } = subjectStats[subject];
@@ -167,9 +199,6 @@ export class StudentDashboard {
         dashboardTbody.innerHTML = tableHTML;
     }
     
-    /**
-     * Helper function to perform the subject attendance calculation.
-     */
     calculateSubjectAttendance() {
         const timetable = this.configManager.getTimetable(this.currentUser.section);
         if (!timetable) return {};
@@ -207,9 +236,6 @@ export class StudentDashboard {
         return subjectStats;
     }
     
-    /**
-     * Renders the visual attendance calendar for the currently selected month.
-     */
     renderAttendanceCalendar() {
         const calendar = document.getElementById('attendanceCalendar');
         const title = document.getElementById('calendarTitle');
@@ -242,24 +268,18 @@ export class StudentDashboard {
         calendar.innerHTML = html;
     }
 
-    /**
-     * Changes the calendar's month and re-renders it.
-     */
     changeMonth(direction) {
         this.calendarDisplayDate.setMonth(this.calendarDisplayDate.getMonth() + direction);
         this.renderAttendanceCalendar();
     }
 
-    /**
-     * Calculates the potential future attendance percentage.
-     */
     calculateFuturePercentage() {
         const futureClassesInput = document.getElementById('futureClasses');
         const resultDiv = document.getElementById('futurePercentageResult');
         const futureClasses = parseInt(futureClassesInput.value, 10);
 
         if (isNaN(futureClasses) || futureClasses <= 0) {
-            resultDiv.innerHTML = `<span class="text-danger">Please enter a valid number of classes.</span>`;
+            resultDiv.innerHTML = `<span class="text-danger">Enter a valid number.</span>`;
             return;
         }
 
@@ -271,12 +291,9 @@ export class StudentDashboard {
         const futureTotal = currentTotal + futureClasses;
         const futurePercentage = futureTotal > 0 ? ((futurePresent / futureTotal) * 100).toFixed(1) : 0;
 
-        resultDiv.innerHTML = `Your new percentage would be <strong class="text-success">${futurePercentage}%</strong>`;
+        resultDiv.innerHTML = `New percentage: <strong class="text-success">${futurePercentage}%</strong>`;
     }
 
-    /**
-     * Checks if the 5-minute attendance window is currently open for any class.
-     */
     checkAttendanceWindow() {
         const now = new Date();
         const currentDay = now.toLocaleString('en-US', { weekday: 'long' });
@@ -298,12 +315,12 @@ export class StudentDashboard {
                 const classEnd = new Date();
                 classEnd.setHours(endHour, endMinute, 0, 0);
 
-                const windowStart = new Date(classEnd.getTime() - 2.5 * 60000); // 2.5 mins before
-                const windowEnd = new Date(classEnd.getTime() + 2.5 * 60000); // 2.5 mins after
+                const windowStart = new Date(classEnd.getTime() - 2.5 * 60000);
+                const windowEnd = new Date(classEnd.getTime() + 2.5 * 60000);
 
                 if (now >= windowStart && now <= windowEnd) {
                     isWindowOpen = true;
-                    windowMessage.textContent = `Attendance window for ${classInfo.subject} is OPEN until ${Utils.formatTime(windowEnd)}!`;
+                    windowMessage.textContent = `Window for ${classInfo.subject} is OPEN until ${Utils.formatTime(windowEnd)}!`;
                     break;
                 }
             }
@@ -320,18 +337,15 @@ export class StudentDashboard {
         }
     }
 
-    /**
-     * Marks attendance if the window is open.
-     */
     async markAttendance() {
         if (document.getElementById('qrScanner').classList.contains('disabled')) {
-            Utils.showAlert("Attendance can only be marked during the open window.", "warning");
+            Utils.showAlert("Can only mark attendance during the open window.", "warning");
             return;
         }
 
         const today = new Date().toISOString().split('T')[0];
         if (this.attendanceHistory[today]) {
-            Utils.showAlert("You have already marked attendance for today.", "info");
+            Utils.showAlert("Attendance already marked for today.", "info");
             return;
         }
 
@@ -339,21 +353,18 @@ export class StudentDashboard {
 
         try {
             await setDoc(attendanceRef, { status: 'present', timestamp: new Date() });
-            Utils.showAlert('Attendance marked successfully!', 'success');
+            Utils.showAlert('Attendance marked!', 'success');
             await this.fetchAttendanceHistory();
             this.updateAttendanceStats();
             this.renderAttendanceCalendar();
             this.renderAttendanceLog();
-            this.renderSubjectAttendance(); // Re-render subject stats after marking attendance
+            this.renderSubjectAttendance();
         } catch (error) {
             console.error("Error marking attendance: ", error);
             Utils.showAlert('Failed to mark attendance.', 'danger');
         }
     }
 
-    /**
-     * Switches the timetable view between sections.
-     */
     switchSection(sectionId) {
         this.currentSection = sectionId;
         this.renderTimetable();
