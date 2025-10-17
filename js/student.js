@@ -2,13 +2,20 @@ import { db } from './firebase-config.js';
 import { doc, setDoc, collection, getDocs, orderBy, query } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 import { Utils } from './utils.js';
 
+// A simple list of holidays for the year. Format: 'YYYY-MM-DD'
+const holidays = {
+    '2025-10-02': 'Gandhi Jayanti',
+    '2025-10-21': 'Diwali',
+    '2025-12-25': 'Christmas Day'
+};
+
 export class StudentDashboard {
     constructor(configManager) {
         this.configManager = configManager;
         this.currentUser = null;
         this.currentSection = 'A';
         this.attendanceHistory = {};
-        this.calendarDisplayDate = new Date();
+        this.calendarDisplayDate = new Date(); // State for calendar navigation
     }
 
     async init(userData) {
@@ -17,7 +24,7 @@ export class StudentDashboard {
         this.calendarDisplayDate = new Date();
 
         this.renderHeader();
-        this.updateCurrentAndNextClass();
+        this.updateCurrentAndNextClass(); // Display current class info
 
         await this.fetchAttendanceHistory();
         this.updateAttendanceStats();
@@ -25,6 +32,7 @@ export class StudentDashboard {
         this.renderSubjectAttendance();
         this.renderAttendanceCalendar();
 
+        // Set up periodic checks
         setInterval(() => this.checkAttendanceWindow(), 30000);
         setInterval(() => this.updateCurrentAndNextClass(), 60000);
         this.checkAttendanceWindow();
@@ -42,7 +50,7 @@ export class StudentDashboard {
         const timetableContent = document.getElementById('timetableContent');
         const sectionData = this.configManager.getTimetable(this.currentSection);
         if (!sectionData || Object.keys(sectionData).length === 0) {
-            timetableContent.innerHTML = '<p>Timetable not available.</p>';
+            timetableContent.innerHTML = '<p>Timetable not available for this section.</p>';
             return;
         }
 
@@ -255,15 +263,20 @@ export class StudentDashboard {
         for (let i = 0; i < firstDayOfMonth; i++) html += `<div></div>`;
 
         for (let day = 1; day <= daysInMonth; day++) {
+            const currentDate = new Date(year, month, day);
+            const dayOfWeek = currentDate.getDay();
             const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            
             const attendanceRecord = this.attendanceHistory[dateStr];
             let dayClass = 'calendar-day';
             const today = new Date();
-
+            
             if (day === today.getDate() && month === today.getMonth() && year === today.getFullYear()) dayClass += ' today';
+            if (dayOfWeek === 0 || dayOfWeek === 6) dayClass += ' weekend';
+            if (holidays[dateStr]) dayClass += ' holiday';
             if (attendanceRecord?.status === 'present') dayClass += ' present';
 
-            html += `<div class="${dayClass}" title="${dateStr}">${day}</div>`;
+            html += `<div class="${dayClass}" title="${holidays[dateStr] || dateStr}" onclick="showDayDetails('${dateStr}')">${day}</div>`;
         }
         calendar.innerHTML = html;
     }
@@ -362,6 +375,23 @@ export class StudentDashboard {
         } catch (error) {
             console.error("Error marking attendance: ", error);
             Utils.showAlert('Failed to mark attendance.', 'danger');
+        }
+    }
+
+    showAttendanceForDay(dateStr) {
+        const record = this.attendanceHistory[dateStr];
+        const holiday = holidays[dateStr];
+        const dayOfWeek = new Date(dateStr + 'T00:00:00').getDay();
+
+        if (record) {
+            const time = new Date(record.timestamp.toDate()).toLocaleTimeString();
+            Utils.showAlert(`Status for ${dateStr}: PRESENT (Marked at ${time})`, 'success');
+        } else if (holiday) {
+            Utils.showAlert(`${holiday} - Holiday`, 'info');
+        } else if (dayOfWeek === 0 || dayOfWeek === 6) {
+            Utils.showAlert('Weekend - No classes scheduled', 'info');
+        } else {
+            Utils.showAlert(`Status for ${dateStr}: ABSENT (No record found)`, 'danger');
         }
     }
 
