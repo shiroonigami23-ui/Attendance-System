@@ -940,3 +940,33 @@ body {
     cursor: pointer;
     font-size: 1.2rem;
 }
+/* --- Additions for New Features --- */
+
+/* Calendar Headers */
+.calendar-day-header {
+    font-weight: bold;
+    text-align: center;
+    color: var(--primary);
+    padding-bottom: 5px;
+}
+
+/* Disabled QR Scanner */
+.qr-scanner.disabled {
+    cursor: not-allowed;
+    background: rgba(113, 128, 150, 0.1);
+    border-color: var(--border);
+}
+
+.qr-scanner.disabled .icon {
+    color: var(--muted);
+}
+
+.qr-scanner.disabled:hover {
+    transform: none;
+    background: rgba(113, 128, 150, 0.1);
+}
+
+/* Text color for danger alerts */
+.text-danger {
+    color: var(--danger);
+}
