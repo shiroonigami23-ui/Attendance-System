@@ -64,98 +64,107 @@
             </div>
         </div>
 
-            <div id="studentDashboard" class="hidden">
-    <header class="header">
-        </header>
-
-    <div id="attendanceWindowBar" class="alert alert-info hidden" style="text-align: center; font-weight: bold;">
-        <i class="alert-icon fas fa-clock"></i>
-        <span id="attendanceWindowMessage"></span>
-    </div>
-
-    <div class="row">
-        </div>
-
-    <div class="row">
-        <div class="col-md-6">
-            <div class="card">
-                <h3 class="card-title">Mark Attendance</h3>
-                <div id="qrScanner" class="qr-scanner disabled" onclick="scanQR()">
-                    <div class="icon"><i class="fas fa-qrcode"></i></div>
-                    <p>Tap to Scan</p>
-                    <small>(Currently Disabled)</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card">
-                <h3 class="card-title">Attendance Calculator</h3>
-                <div class="form-group mt-3">
-                    <label for="futureClasses">If I attend the next...</label>
-                    <input type="number" id="futureClasses" class="form-control" placeholder="e.g., 5" min="1">
-                </div>
-                <button class="btn btn-primary w-100" onclick="window.app.studentDashboard.calculateFuturePercentage()">Calculate</button>
-                <div id="futurePercentageResult" class="text-center mt-3" style="font-size: 1.2rem;"></div>
-            </div>
-        </div>
-    </div>
-
-    <div class="card mt-3">
-        <div class="nav-tabs">
-            <button class="nav-tab active" onclick="switchDashboardTab('dashboard')">Dashboard</button>
-            <button class="nav-tab" onclick="switchDashboardTab('timetable')">Timetable</button>
-            <button class="nav-tab" onclick="switchDashboardTab('history')">History</button>
-        </div>
-
-        <div id="dashboardTab" class="tab-panel active">
-            <h3 class="card-title mt-3">Subject-wise Attendance Summary</h3>
-            <div class="table-responsive">
-                <table class="table">
-                    <thead>
-                        <tr><th>Subject</th><th>Attended</th><th>Total Classes</th><th>Percentage</th></tr>
-                    </thead>
-                    <tbody id="subjectAttendanceTableDashboard"></tbody>
-                </table>
-            </div>
-        </div>
-
-        <div id="timetableTab" class="tab-panel">
-             <div class="section-buttons">
-                <button id="sectionA" class="section-btn active" onclick="switchSection('A')">Section A</button>
-                <button id="sectionB" class="section-btn" onclick="switchSection('B')">Section B</button>
-            </div>
-            <div id="timetableContent" class="timetable-container"></div>
-        </div>
-
-        <div id="historyTab" class="tab-panel">
-            <div class="row">
-                <div class="col-md-5">
-                    <div class="d-flex justify-content-between align-items-center mt-3">
-                         <h3 class="card-title" id="calendarTitle">Attendance Calendar</h3>
-                         <div>
-                            <button class="btn btn-sm btn-secondary" onclick="changeCalendarMonth(-1)"><i class="fas fa-chevron-left"></i></button>
-                            <button class="btn btn-sm btn-secondary" onclick="changeCalendarMonth(1)"><i class="fas fa-chevron-right"></i></button>
-                         </div>
+        <div id="studentDashboard" class="hidden">
+            <header class="header">
+                <div class="header-content">
+                    <div>
+                        <h1><span id="userAvatar" class="user-avatar">S</span> <span id="userName">Student Name</span></h1>
+                        <p><span id="userRoll">Roll Number</span> | <span id="userSection">Section</span></p>
                     </div>
-                    <div id="attendanceCalendar" class="calendar-grid mt-3"></div>
+                    <div class="header-controls">
+                        <div class="text-center">
+                            <div id="currentTime" style="font-size: 1.2rem; font-weight: 600;"></div>
+                            <div id="currentDate" style="font-size: 0.9rem; color: var(--muted);"></div>
+                        </div>
+                        <button id="themeToggle" class="theme-toggle"><i class="fas fa-moon"></i> <span>Dark Mode</span></button>
+                    </div>
                 </div>
-                <div class="col-md-7">
-                     <h3 class="card-title mt-3">Daily Attendance Log</h3>
-                     <div class="table-responsive" style="max-height: 300px;">
-                         <table class="table">
-                             <thead>
-                                 <tr><th>Date</th><th>Status</th><th>Time Marked</th></tr>
-                             </thead>
-                             <tbody id="attendanceLogTable"></tbody>
-                         </table>
-                     </div>
+            </header>
+
+            <div id="attendanceWindowBar" class="alert alert-info hidden" style="text-align: center; font-weight: bold;">
+                <i class="alert-icon fas fa-clock"></i>
+                <span id="attendanceWindowMessage"></span>
+            </div>
+
+            <div class="row">
+                <div class="col-md-3"><div class="stats-card"><div class="icon" style="color: var(--success);"><i class="fas fa-check-circle"></i></div><div id="totalPresent" class="number">0</div><div class="label">Total Present</div></div></div>
+                <div class="col-md-3"><div class="stats-card"><div class="icon" style="color: var(--danger);"><i class="fas fa-times-circle"></i></div><div id="totalAbsent" class="number">0</div><div class="label">Total Absent</div></div></div>
+                <div class="col-md-3"><div class="stats-card"><div class="icon"><i class="fas fa-calendar-alt"></i></div><div id="totalClasses" class="number">0</div><div class="label">Total Classes</div></div></div>
+                <div class="col-md-3"><div class="stats-card"><div class="icon" style="color: var(--accent);"><i class="fas fa-percentage"></i></div><div id="attendancePercentage" class="number">0%</div><div class="label">Percentage</div></div></div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card">
+                        <h3 class="card-title">Mark Attendance</h3>
+                        <p class="card-subtitle mb-3">Scanning is enabled only during the attendance window.</p>
+                        <div id="qrScanner" class="qr-scanner disabled" onclick="scanQR()">
+                            <div class="icon"><i class="fas fa-qrcode"></i></div>
+                            <p>Tap to Scan</p>
+                            <small>(Currently Disabled)</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                     <div class="card">
+                         <h3 class="card-title">Current & Next Class</h3>
+                         <div id="currentClass">-</div>
+                         <hr style="margin: 1rem 0;">
+                         <div id="nextClass">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="nav-tabs">
+                    <button class="nav-tab active" onclick="switchDashboardTab('dashboard')">Dashboard</button>
+                    <button class="nav-tab" onclick="switchDashboardTab('timetable')">Timetable</button>
+                    <button class="nav-tab" onclick="switchDashboardTab('history')">History</button>
+                </div>
+
+                <div id="dashboardTab" class="tab-panel active">
+                    <h3 class="card-title mt-3">Subject-wise Attendance Summary</h3>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead><tr><th>Subject</th><th>Attended</th><th>Total Classes</th><th>Percentage</th></tr></thead>
+                            <tbody id="subjectAttendanceTableDashboard"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="timetableTab" class="tab-panel">
+                     <div class="section-buttons">
+                        <button id="sectionA" class="section-btn active" onclick="switchSection('A')">Section A</button>
+                        <button id="sectionB" class="section-btn" onclick="switchSection('B')">Section B</button>
+                    </div>
+                    <div id="timetableContent" class="timetable-container"></div>
+                </div>
+
+                <div id="historyTab" class="tab-panel">
+                    <div class="row">
+                        <div class="col-md-5">
+                            <div class="d-flex justify-content-between align-items-center mt-3">
+                                 <h3 class="card-title" id="calendarTitle">Attendance Calendar</h3>
+                                 <div>
+                                    <button class="btn btn-sm btn-secondary" onclick="changeCalendarMonth(-1)"><i class="fas fa-chevron-left"></i></button>
+                                    <button class="btn btn-sm btn-secondary" onclick="changeCalendarMonth(1)"><i class="fas fa-chevron-right"></i></button>
+                                 </div>
+                            </div>
+                            <div id="attendanceCalendar" class="calendar-grid mt-3"></div>
+                        </div>
+                        <div class="col-md-7">
+                             <h3 class="card-title mt-3">Daily Attendance Log</h3>
+                             <div class="table-responsive" style="max-height: 300px;">
+                                 <table class="table">
+                                     <thead><tr><th>Date</th><th>Status</th><th>Time Marked</th></tr></thead>
+                                     <tbody id="attendanceLogTable"></tbody>
+                                 </table>
+                             </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-            </div>
-        
-        
 
         <div id="adminDashboard" class="hidden">
              <header class="header">
@@ -281,7 +290,6 @@
 
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
-    
     <script type="module" src="js/app.js"></script>
 </body>
 </html>
