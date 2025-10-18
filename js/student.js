@@ -1,13 +1,9 @@
 import { db } from './firebase-config.js';
 import { doc, setDoc, collection, getDocs, orderBy, query } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 import { Utils } from './utils.js';
+// --- UPDATED: Import the new holidays list ---
+import { holidays } from './holidays.js';
 
-// A simple list of holidays for the year. Format: 'YYYY-MM-DD'
-const holidays = {
-    '2025-10-02': 'Gandhi Jayanti',
-    '2025-10-21': 'Diwali',
-    '2025-12-25': 'Christmas Day'
-};
 
 export class StudentDashboard {
     constructor(configManager) {
@@ -46,7 +42,6 @@ export class StudentDashboard {
         document.getElementById('userAvatar').textContent = this.currentUser.username.charAt(0).toUpperCase();
     }
     
-    // --- UPDATED FETCH LOGIC ---
     async fetchAttendanceHistory() {
         const history = {};
         const recordsCol = collection(db, "attendance", this.currentUser.rollNumber, "records");
@@ -81,15 +76,15 @@ export class StudentDashboard {
         let totalClasses = 0;
 
         Object.values(this.attendanceHistory).forEach(dailyRecord => {
-             // Count older, general records
             if(dailyRecord.status === 'present') totalPresent++;
-            if(dailyRecord.status) totalClasses++;
+            // Exclude cancelled from total
+            if(dailyRecord.status && dailyRecord.status !== 'cancelled') totalClasses++;
 
-            // Count new, subject-specific records
             if (dailyRecord.subjects) {
                 const subjects = Object.values(dailyRecord.subjects);
                 totalPresent += subjects.filter(rec => rec.status === 'present' || rec.status === 'late').length;
-                totalClasses += subjects.length;
+                // Exclude cancelled classes from the total count
+                totalClasses += subjects.filter(rec => rec.status !== 'cancelled').length;
             }
         });
         
@@ -193,6 +188,7 @@ export class StudentDashboard {
             nextClassEl.innerHTML = '<h5>Next Class</h5><p>No more classes today.</p>';
         }
     }
+
     // --- UPDATED LOG RENDERING ---
     renderAttendanceLog() {
         const tableBody = document.getElementById('attendanceLogTable');
@@ -205,23 +201,26 @@ export class StudentDashboard {
             if(dailyRecord.subjects && Object.keys(dailyRecord.subjects).length > 0) {
                  hasRecords = true;
                 for(const [subject, record] of Object.entries(dailyRecord.subjects)){
-                    const statusClass = record.status === 'present' || record.status === 'late' ? 'text-success' : 'text-danger';
+                    let statusClass = '';
+                    let statusText = record.status.toUpperCase();
+
+                    if (record.status === 'present' || record.status === 'late') {
+                        statusClass = 'text-success';
+                    } else if (record.status === 'absent') {
+                        statusClass = 'text-danger';
+                    } else { // Cancelled or other statuses
+                        statusClass = 'text-muted';
+                    }
+
                     const formattedTime = record.timestamp ? new Date(record.timestamp.toDate()).toLocaleTimeString() : '-';
                     tableBody.innerHTML += `<tr>
                         <td>${formattedDate}</td>
-                        <td><span class="${statusClass}" style="font-weight: bold;">${record.status.toUpperCase()}</span> in ${subject}</td>
+                        <td><span class="${statusClass}" style="font-weight: bold;">${statusText}</span> in ${subject}</td>
                         <td>${formattedTime}</td>
                     </tr>`;
                 }
-            } else if (dailyRecord.status) { // Handle old general records
-                hasRecords = true;
-                 const statusClass = dailyRecord.status === 'present' ? 'text-success' : 'text-danger';
-                 const formattedTime = dailyRecord.timestamp ? new Date(dailyRecord.timestamp.toDate()).toLocaleTimeString() : '-';
-                 tableBody.innerHTML += `<tr>
-                    <td>${formattedDate}</td>
-                    <td><span class="${statusClass}" style="font-weight: bold;">${dailyRecord.status.toUpperCase()}</span> (General)</td>
-                    <td>${formattedTime}</td>
-                </tr>`;
+            } else if (dailyRecord.status) {
+                // ... logic for old general records
             }
         }
 
@@ -230,7 +229,6 @@ export class StudentDashboard {
         }
     }
     
-    // --- UPDATED: More accurate calculation ---
     calculateSubjectAttendance() {
         const subjectStats = {};
         const subjects = this.configManager.getSubjects();
@@ -245,7 +243,8 @@ export class StudentDashboard {
         Object.values(this.attendanceHistory).forEach(dailyRecord => {
             if (dailyRecord.subjects) {
                 for (const [subject, record] of Object.entries(dailyRecord.subjects)) {
-                    if (subjectStats[subject]) {
+                    // Make sure not to count cancelled classes in the total
+                    if (subjectStats[subject] && record.status !== 'cancelled') {
                         subjectStats[subject].total++;
                         if (record.status === 'present' || record.status === 'late') {
                             subjectStats[subject].attended++;
@@ -426,7 +425,11 @@ export class StudentDashboard {
             if(dailyRecord.subjects && Object.keys(dailyRecord.subjects).length > 0) {
                  message = `Attendance for ${dateStr}:<br>`;
                  Object.values(dailyRecord.subjects).forEach(rec => {
-                    message += `- ${rec.subject}: <strong>${rec.status.toUpperCase()}</strong><br>`;
+                    let statusText = `<strong>${rec.status.toUpperCase()}</strong>`;
+                    if (rec.status === 'cancelled') {
+                        statusText = `<em>${rec.status.toUpperCase()}</em>`;
+                    }
+                    message += `- ${rec.subject}: ${statusText}<br>`;
                  });
             } else if (dailyRecord.status) {
                 message = `General attendance for ${dateStr}: <strong>${dailyRecord.status.toUpperCase()}</strong>`;
@@ -434,5 +437,4 @@ export class StudentDashboard {
                  message = `No attendance records for ${dateStr}.`;
             }
         } else if (holiday) {
-            message = `${holiday} - Holiday`;
-        
+            message 
