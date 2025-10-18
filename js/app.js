@@ -119,11 +119,12 @@ window.refreshAdminData = () => window.app.adminDashboard.loadRegisteredStudents
 window.exportStudentData = () => window.app.adminDashboard.exportStudentData();
 window.markManualAttendance = () => window.app.adminDashboard.markManualAttendance();
 window.cancelClass = () => window.app.adminDashboard.cancelClass();
+// --- NEW: Hook for the cancel entire day button ---
+window.cancelEntireDay = () => window.app.adminDashboard.cancelEntireDay();
 window.generateClassReport = () => window.app.adminDashboard.generateClassReport();
 window.exportReport = () => window.app.adminDashboard.exportCurrentReport();
 window.bulkLogout = () => window.app.adminDashboard.bulkLogout();
 window.clearDeviceData = () => window.app.adminDashboard.clearAllDeviceData();
-// --- NEW: Functions for the student detail modal ---
 window.viewStudentDetails = (rollNumber) => window.app.adminDashboard.showStudentAttendanceModal(rollNumber);
 window.closeStudentModal = () => document.getElementById('studentDetailModal').classList.add('hidden');
 
