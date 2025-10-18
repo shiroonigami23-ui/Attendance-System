@@ -1,5 +1,5 @@
 import { db } from './firebase-config.js';
-import { doc, setDoc, collection, getDocs, orderBy, query } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+import { doc, setDoc, getDoc, collection, getDocs, orderBy, query } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 import { Utils } from './utils.js';
 import { holidays } from './holidays.js';
 
@@ -19,7 +19,7 @@ export class StudentDashboard {
         this.calendarDisplayDate = new Date();
 
         this.renderHeader();
-        this.displayDayStatusMessage(); // Check for weekends/holidays
+        this.displayDayStatusMessage();
 
         await this.fetchAttendanceHistory();
         this.updateAttendanceStats();
@@ -39,12 +39,11 @@ export class StudentDashboard {
         document.getElementById('userAvatar').textContent = this.currentUser.username.charAt(0).toUpperCase();
     }
     
-    // --- NEW: Displays a banner for holidays or weekends ---
     displayDayStatusMessage() {
         const messageContainer = document.getElementById('dayStatusMessage');
         const messageSpan = messageContainer.querySelector('span');
         const now = new Date();
-        const dayOfWeek = now.getDay(); // Sunday = 0, Saturday = 6
+        const dayOfWeek = now.getDay();
         const dateStr = now.toISOString().split('T')[0];
 
         const holiday = holidays[dateStr];
@@ -52,11 +51,11 @@ export class StudentDashboard {
         if (holiday) {
             messageSpan.textContent = `Today is ${holiday}. Enjoy the day off!`;
             messageContainer.classList.remove('hidden');
-            messageContainer.className = 'alert alert-info'; // Blue style for holidays
-        } else if (dayOfWeek === 0 || dayOfWeek === 6) { // 0 for Sunday, 6 for Saturday
+            messageContainer.className = 'alert alert-info';
+        } else if (dayOfWeek === 0 || dayOfWeek === 6) {
             messageSpan.textContent = `It's the weekend! No classes are scheduled today.`;
             messageContainer.classList.remove('hidden');
-            messageContainer.className = 'alert alert-success'; // Green style for weekends
+            messageContainer.className = 'alert alert-success';
         } else {
             messageContainer.classList.add('hidden');
         }
@@ -341,13 +340,19 @@ export class StudentDashboard {
                 if (classInfo.subject.toLowerCase().includes('study') || classInfo.type.toLowerCase() === 'break') continue;
 
                 const [startTimeStr, endTimeStr] = timeSlot.split('-');
+                const [startHour, startMinute] = startTimeStr.split(':').map(Number);
                 const [endHour, endMinute] = endTimeStr.split(':').map(Number);
+                
+                const classStart = new Date();
+                classStart.setHours(startHour, startMinute, 0, 0);
 
                 const classEnd = new Date();
                 classEnd.setHours(endHour, endMinute, 0, 0);
 
-                const windowStart = new Date(classEnd.getTime() - 2.5 * 60000);
-                const windowEnd = new Date(classEnd.getTime() + 2.5 * 60000);
+                // --- ADJUSTED WINDOW LOGIC ---
+                // Window opens at the start of the class and closes 5 minutes after.
+                const windowStart = classStart;
+                const windowEnd = new Date(classEnd.getTime() + 5 * 60000);
 
                 if (now >= windowStart && now <= windowEnd) {
                     isWindowOpen = true;
@@ -360,7 +365,7 @@ export class StudentDashboard {
         if (isWindowOpen) {
             windowBar.classList.remove('hidden');
             qrScanner.classList.remove('disabled');
-            qrScanner.querySelector('small').textContent = '(Scanning Enabled)';
+            qrScanner.querySelector('small').textContent = '(Tap to mark)';
         } else {
             windowBar.classList.add('hidden');
             qrScanner.classList.add('disabled');
@@ -368,10 +373,80 @@ export class StudentDashboard {
         }
     }
 
+    // --- NEW: Implemented "Tap to Scan" Logic ---
     async markAttendance() {
-        Utils.showAlert("Marking attendance would require class info from the QR code.", "info");
+        const qrScanner = document.getElementById('qrScanner');
+        if (qrScanner.classList.contains('disabled')) {
+            Utils.showAlert('The attendance window is currently closed.', 'warning');
+            return;
+        }
+
+        const now = new Date();
+        const currentDay = now.toLocaleString('en-US', { weekday: 'long' });
+        const timetable = this.configManager.getTimetable(this.currentUser.section);
+        const daySchedule = timetable?.[currentDay];
+        
+        let currentClassInfo = null;
+
+        if (daySchedule) {
+            for (const [timeSlot, classInfo] of Object.entries(daySchedule)) {
+                 const [startTimeStr, endTimeStr] = timeSlot.split('-');
+                 const [startHour, startMinute] = startTimeStr.split(':').map(Number);
+                 const [endHour, endMinute] = endTimeStr.split(':').map(Number);
+                
+                const classStart = new Date();
+                classStart.setHours(startHour, startMinute, 0, 0);
+                const classEnd = new Date();
+                classEnd.setHours(endHour, endMinute, 0, 0);
+
+                const windowStart = classStart;
+                const windowEnd = new Date(classEnd.getTime() + 5 * 60000);
+
+                if (now >= windowStart && now <= windowEnd) {
+                    currentClassInfo = classInfo;
+                    break;
+                }
+            }
+        }
+
+        if (!currentClassInfo) {
+            Utils.showAlert('Could not determine the current class. Please try again within the window.', 'danger');
+            return;
+        }
+        
+        const className = `${currentClassInfo.subject}`;
+        const dateStr = now.toISOString().split('T')[0];
+        const attendanceRef = doc(db, "attendance", this.currentUser.rollNumber, "records", dateStr, "subjects", className);
+
+        try {
+            const docSnap = await getDoc(attendanceRef);
+            if (docSnap.exists()) {
+                Utils.showAlert(`You are already marked for ${className}.`, 'info');
+                return;
+            }
+
+            await setDoc(attendanceRef, {
+                status: 'present',
+                subject: className,
+                timestamp: new Date(),
+                markedBy: 'student'
+            });
+
+            Utils.showAlert(`Attendance marked for ${className}!`, 'success');
+            // Refresh data after marking
+            await this.fetchAttendanceHistory();
+            this.updateAttendanceStats();
+            this.renderAttendanceLog();
+            this.renderSubjectAttendance();
+
+        } catch (error) {
+            console.error("Error marking attendance:", error);
+            Utils.showAlert('Failed to mark attendance. Please try again.', 'danger');
+        }
     }
 
+
+    
     showAttendanceForDay(dateStr) {
         const dailyRecord = this.attendanceHistory[dateStr];
         const holiday = holidays[dateStr];
