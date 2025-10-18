@@ -86,6 +86,8 @@
                  <div class="nav-tabs">
                     <button class="nav-tab active" onclick="switchAdminTab('students')">Students</button>
                     <button class="nav-tab" onclick="switchAdminTab('attendance')">Attendance</button>
+                    <!-- NEW: Added 'Cancel Class' tab -->
+                    <button class="nav-tab" onclick="switchAdminTab('cancel')">Cancel Class</button>
                     <button class="nav-tab" onclick="switchAdminTab('reports')">Reports</button>
                     <button class="nav-tab" onclick="switchAdminTab('settings')">Settings</button>
                 </div>
@@ -111,7 +113,11 @@
                             <button class="btn btn-primary" onclick="markManualAttendance()">Submit Attendance</button>
                         </div>
                     </div>
-                    <hr style="margin: 2rem 0;">
+                    <!-- MOVED: 'Cancel a Class' section moved to its own tab -->
+                </div>
+
+                <!-- NEW: 'Cancel Class' tab panel -->
+                <div id="adminCancelTab" class="tab-panel">
                     <div class="row">
                         <div class="col-md-6">
                             <h3 class="card-title">Cancel a Class</h3>
@@ -137,6 +143,7 @@
                     <!-- This container will be dynamically filled by JS -->
                     <div id="reportDateContainer" class="form-group"></div>
                     <button class="btn btn-info" onclick="generateClassReport()"><i class="fas fa-chart-bar"></i> Generate Report</button>
+                    <!-- This is where the generated report table will be displayed -->
                     <div id="reportDisplay" class="mt-4"></div>
                 </div>
                 
@@ -152,6 +159,7 @@
             </div>
         </div>
 
+        <!-- Device Warning -->
         <div id="deviceWarning" class="device-warning hidden">
              <div class="icon"><i class="fas fa-exclamation-triangle"></i></div>
              <h2>Device Mismatch</h2>
@@ -164,3 +172,5 @@
     <script type="module" src="js/app.js"></script>
 </body>
 </html>
+
+
