@@ -86,7 +86,7 @@
                  <div class="nav-tabs">
                     <button class="nav-tab active" onclick="switchAdminTab('students')">Students</button>
                     <button class="nav-tab" onclick="switchAdminTab('attendance')">Attendance</button>
-                    <button class="nav-tab" onclick="switchAdminTab('cancel')">Cancel Class</button>
+                     <button class="nav-tab" onclick="switchAdminTab('cancel')">Cancel Class</button>
                     <button class="nav-tab" onclick="switchAdminTab('reports')">Reports</button>
                     <button class="nav-tab" onclick="switchAdminTab('settings')">Settings</button>
                 </div>
@@ -105,18 +105,9 @@
                         </div>
                         <div class="col-md-6">
                             <h3 class="card-title">Manual Attendance</h3>
-                            <p class="card-subtitle">Mark attendance for a student manually.</p>
-                            <!-- NEW: Added a date input -->
-                            <div class="form-group">
-                                <label for="manualAttendanceDate">Date</label>
-                                <input type="date" id="manualAttendanceDate" class="form-control">
-                            </div>
-                            <div class="form-group">
-                                <label for="manualRollNumber">Roll Number</label>
-                                <input list="studentRollNumbers" id="manualRollNumber" class="form-control" placeholder="Type or select a Roll Number">
-                                <datalist id="studentRollNumbers">
-                                </datalist>
-                            </div>
+                            <p class="card-subtitle">Mark or update attendance for a student.</p>
+                            <div class="form-group"><label for="manualAttendanceDate">Date</label><input type="date" id="manualAttendanceDate" class="form-control"></div>
+                            <div class="form-group"><label for="manualRollNumber">Roll Number</label><input type="text" id="manualRollNumber" class="form-control" placeholder="Type or select a student" list="studentRollNumbers"><datalist id="studentRollNumbers"></datalist></div>
                             <div class="form-group"><label>Select Class</label><select id="manualClassSelector" class="form-select"></select></div>
                             <div class="form-group"><label>Status</label><select id="attendanceStatus" class="form-select"><option value="present">Present</option><option value="absent">Absent</option><option value="late">Late</option></select></div>
                             <button class="btn btn-primary" onclick="markManualAttendance()">Submit Attendance</button>
@@ -124,35 +115,36 @@
                     </div>
                 </div>
 
-                <!-- 'Cancel Class' tab panel -->
+                <!-- Cancel Class Tab -->
                 <div id="adminCancelTab" class="tab-panel">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <h3 class="card-title">Cancel a Class</h3>
-                            <p class="card-subtitle">Cancel a class for all students (e.g., holiday, event).</p>
-                            <div class="form-group"><label for="cancelDate">Date of Cancellation</label><input type="date" id="cancelDate" class="form-control"></div>
-                            <div class="form-group"><label for="cancelClassSelector">Select Class to Cancel</label><select id="cancelClassSelector" class="form-select"></select></div>
-                            <button class="btn btn-warning" onclick="cancelClass()"><i class="fas fa-calendar-times"></i> Cancel Class</button>
-                        </div>
-                    </div>
+                    <h3 class="card-title">Cancel a Class</h3>
+                    <p class="card-subtitle">Cancel a class for all students (e.g., holiday, event).</p>
+                    <div class="form-group"><label for="cancelDate">Date of Cancellation</label><input type="date" id="cancelDate" class="form-control"></div>
+                    <div class="form-group"><label for="cancelClassSelector">Select Class to Cancel</label><select id="cancelClassSelector" class="form-select"></select></div>
+                    <button class="btn btn-warning" onclick="cancelClass()"><i class="fas fa-calendar-times"></i> Cancel Class</button>
                 </div>
 
                 <!-- Reports Tab -->
                 <div id="adminReportsTab" class="tab-panel">
                     <h3 class="card-title">Generate Reports</h3>
-                    <div class="form-group">
-                        <label>Report Type</label>
-                        <select id="reportType" class="form-select">
-                            <option value="daily">Daily Attendance Report</option>
-                            <option value="weekly">Weekly Summary</option>
-                            <option value="monthly">Monthly Defaulter List (&lt;75%)</option>
-                        </select>
+                    <div class="row">
+                        <div class="col-md-6">
+                             <div class="form-group"><label>Report Type</label><select id="reportType" class="form-select"><option value="daily">Daily Attendance Report</option><option value="weekly">Weekly Summary</option><option value="monthly">Monthly Defaulter List</option></select></div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group" id="reportDateContainer">
+                                <!-- This will be dynamically populated -->
+                            </div>
+                        </div>
                     </div>
-                    <div id="reportDateContainer" class="form-group"></div>
-                    <button class="btn btn-info" onclick="generateClassReport()"><i class="fas fa-chart-bar"></i> Generate Report</button>
+                    <!-- --- NEW: Added Export Button --- -->
+                    <div class="d-flex gap-3">
+                        <button class="btn btn-info" onclick="generateClassReport()"><i class="fas fa-chart-bar"></i> Generate Report</button>
+                        <button class="btn btn-secondary" onclick="exportReport()"><i class="fas fa-file-excel"></i> Export Report to CSV</button>
+                    </div>
                     <div id="reportDisplay" class="mt-4"></div>
                 </div>
-                
+
                 <!-- Settings Tab -->
                 <div id="adminSettingsTab" class="tab-panel">
                     <h3 class="card-title">System Settings</h3>
