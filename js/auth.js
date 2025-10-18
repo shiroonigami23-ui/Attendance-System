@@ -1,7 +1,7 @@
 // js/auth.js
 
 import { db } from './firebase-config.js';
-import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+import { doc, getDoc, setDoc, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 import { Utils } from './utils.js';
 
 export class AuthManager {
@@ -23,25 +23,47 @@ export class AuthManager {
             return null;
         }
 
-        const deviceData = await this.getDeviceRegistration();
+        // --- NEW & IMPROVED TWO-WAY DEVICE LOCK LOGIC ---
 
-        // If device is already registered to someone else, block login
-        if (deviceData && deviceData.rollNumber !== rollNumber) {
+        // 1. Check if THIS device is registered to any student.
+        const thisDeviceRegistration = await this.getDeviceRegistration();
+
+        // 2. Check if the STUDENT trying to log in is registered on ANY other device.
+        const studentDeviceQuery = query(collection(db, "devices"), where("rollNumber", "==", rollNumber));
+        const studentDeviceSnap = await getDocs(studentDeviceQuery);
+        let studentRegisteredDeviceId = null;
+        if (!studentDeviceSnap.empty) {
+            // Student's account is already tied to a device. Get that device's ID.
+            studentRegisteredDeviceId = studentDeviceSnap.docs[0].id;
+        }
+
+        // --- APPLY STRICT SECURITY CHECKS ---
+
+        // SCENARIO 1: This device is already taken by a DIFFERENT student. BLOCK.
+        if (thisDeviceRegistration && thisDeviceRegistration.rollNumber !== rollNumber) {
             Utils.showAlert('This device is registered to another user.', 'danger');
             document.getElementById('deviceWarning').classList.remove('hidden');
             document.getElementById('authContainer').classList.add('hidden');
             return null;
         }
 
+        // SCENARIO 2: This student's account is already locked to a DIFFERENT device. BLOCK.
+        if (studentRegisteredDeviceId && studentRegisteredDeviceId !== this.deviceId) {
+            Utils.showAlert('Your account is locked to another device. Please use your original registered device or contact an admin.', 'danger');
+            document.getElementById('deviceWarning').classList.remove('hidden');
+            document.getElementById('authContainer').classList.add('hidden');
+            return null;
+        }
+        
+        // --- If all checks pass, proceed with login ---
         const userData = {
             rollNumber,
             username: Utils.sanitizeInput(username),
-            password, // In a real app, hash this!
+            password, // In a real app, this should be hashed!
             section,
             role: 'student'
         };
 
-        // If device is not registered, or registered to the current user, proceed
         const userRef = doc(db, "users", rollNumber);
         const userSnap = await getDoc(userRef);
 
@@ -57,7 +79,7 @@ export class AuthManager {
             await setDoc(userRef, userData);
         }
 
-        // Register the device to this user
+        // Register or update the device to this user. This is now safe.
         const deviceRef = doc(db, "devices", this.deviceId);
         await setDoc(deviceRef, {
             rollNumber,
@@ -98,10 +120,8 @@ export class AuthManager {
             return this.currentUser; // User is already in session
         }
         
-        // If no session, check if device is registered
         const deviceData = await this.getDeviceRegistration();
         if (deviceData && deviceData.rollNumber) {
-            // Device is registered, fetch user data and log them in automatically
             const userRef = doc(db, "users", deviceData.rollNumber);
             const userSnap = await getDoc(userRef);
             if (userSnap.exists()) {
