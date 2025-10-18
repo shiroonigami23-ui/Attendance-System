@@ -98,7 +98,6 @@
                 
                 <!-- Attendance Tab -->
                 <div id="adminAttendanceTab" class="tab-panel">
-                    <!-- --- REMOVED QR Code Generation Section --- -->
                     <h3 class="card-title">Manual Attendance</h3>
                     <p class="card-subtitle">Mark or update attendance for a student.</p>
                     <div class="form-group"><label for="manualAttendanceDate">Date</label><input type="date" id="manualAttendanceDate" class="form-control"></div>
@@ -157,6 +156,17 @@
              <p>Please log in from your original registered device or contact the system administrator to reset your device registration.</p>
         </div>
     </div>
+
+    <!-- NEW: Student Attendance Modal -->
+    <div id="studentDetailModal" class="modal-overlay hidden">
+        <div class="modal-content card">
+            <button class="modal-close" onclick="closeStudentModal()">&times;</button>
+            <div id="modalContent">
+                <!-- Content will be injected here -->
+            </div>
+        </div>
+    </div>
+
 
     <!-- Scripts -->
     <script type="module" src="js/app.js"></script>
