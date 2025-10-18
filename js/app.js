@@ -60,7 +60,7 @@ class AttendanceSystem {
             if (user) this.showUI(user);
         });
 
-        document.getElementById('adminAuthForm').addEventListener('submit', async (e) => {
+        document.getElementById('adminAuthForm').addEventListener('submit', (e) => {
             e.preventDefault();
             const username = document.getElementById('adminUsername').value;
             const password = document.getElementById('adminPassword').value;
@@ -73,11 +73,9 @@ class AttendanceSystem {
     }
 }
 
-// --- INITIALIZE THE APP ---
 window.app = new AttendanceSystem();
 
-// --- GLOBAL FUNCTIONS (The 'Switchboard') ---
-// These connect the HTML buttons to the code in your other JS files.
+// --- GLOBAL FUNCTIONS ---
 
 // Auth Tabs
 window.switchTab = (tabId) => {
@@ -110,18 +108,7 @@ window.switchAdminTab = (tabId) => {
 window.changeCalendarMonth = (direction) => window.app.studentDashboard.changeMonth(direction);
 window.showDayDetails = (dateStr) => window.app.studentDashboard.showAttendanceForDay(dateStr);
 window.switchSection = (sectionId) => window.app.studentDashboard.switchSection(sectionId);
-
-// --- RESTORED QR SCAN SIMULATION ---
-window.scanQR = () => {
-    Utils.showAlert("Simulating QR scan...", "info", 2000);
-    // This timeout simulates the time it takes for a camera to scan a code
-    setTimeout(() => {
-        // In a real app, the QR code would contain the class info.
-        // We'll pass a placeholder to the markAttendance function.
-        window.app.studentDashboard.markAttendance("CS501 - Theory of Computation"); 
-    }, 1500);
-};
-
+window.scanQR = () => window.app.studentDashboard.markAttendance(); 
 
 // Admin Functions
 window.adminLogout = () => {
@@ -129,14 +116,17 @@ window.adminLogout = () => {
     window.app.showUI(null);
 };
 window.refreshAdminData = () => window.app.adminDashboard.loadRegisteredStudents();
+window.exportStudentData = () => window.app.adminDashboard.exportStudentData();
 window.markManualAttendance = () => window.app.adminDashboard.markManualAttendance();
 window.cancelClass = () => window.app.adminDashboard.cancelClass();
 window.generateClassReport = () => window.app.adminDashboard.generateClassReport();
-// --- NEW: Connecting the export button ---
 window.exportReport = () => window.app.adminDashboard.exportCurrentReport();
-window.exportStudentData = () => window.app.adminDashboard.exportStudentData();
 window.bulkLogout = () => window.app.adminDashboard.bulkLogout();
 window.clearDeviceData = () => window.app.adminDashboard.clearAllDeviceData();
+// --- NEW: Functions for the student detail modal ---
+window.viewStudentDetails = (rollNumber) => window.app.adminDashboard.showStudentAttendanceModal(rollNumber);
+window.closeStudentModal = () => document.getElementById('studentDetailModal').classList.add('hidden');
+
 
 // --- START THE APP ---
 document.addEventListener('DOMContentLoaded', () => {
