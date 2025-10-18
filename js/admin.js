@@ -187,7 +187,7 @@ export class AdminDashboard {
     async clearAllDeviceData() {if(confirm("DANGER: This will de-register ALL devices. Are you sure?")) {
         // This is an alias for bulkLogout in this context
             const devicesSnap = await getDocs(collection(db, "devices"));
-        await this.bulkLogout();
+            await this.bulkLogout();
             const promises = devicesSnap.docs.map(deviceDoc => deleteDoc(deviceDoc.ref));
             await Promise.all(promises);
             Utils.showAlert('All device data cleared!', 'success');
