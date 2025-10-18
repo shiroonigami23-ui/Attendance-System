@@ -18,8 +18,9 @@ export class AuthManager {
     }
 
     async loginStudent(rollNumber, username, password, section) {
+        // --- FIX: Stricter validation is now handled by the Utils function ---
         if (!Utils.isValidRollNumber(rollNumber, this.configManager)) {
-            Utils.showAlert('Invalid roll number format.', 'danger');
+            Utils.showAlert('Invalid roll number format. It must exactly match the required pattern (e.g., 0902CS231001).', 'danger');
             return null;
         }
 
@@ -62,7 +63,6 @@ export class AuthManager {
             }
             userData = existingData; // Use the existing user data
         } else {
-            // --- THIS IS THE CRITICAL FIX ---
             // New user, create their data object FIRST
             userData = {
                 rollNumber,
