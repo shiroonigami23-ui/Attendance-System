@@ -148,9 +148,22 @@
     </div>
 
     <!-- Scripts -->
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <!-- 
+      FIX: The only change needed is to remove the conflicting Firebase scripts.
+      Your JavaScript files already import the necessary Firebase modules.
+      Including these old compat versions causes a conflict and stops the app from working.
+    -->
+    <!-- 
+      <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+      <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    -->
+
+    <!-- 
+      The path "js/app.js" is CORRECT because your files are in a "js" folder.
+      My previous advice to change this was a mistake.
+    -->
     <script type="module" src="js/app.js"></script>
 </body>
 </html>
+
 
