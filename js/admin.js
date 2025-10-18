@@ -10,17 +10,12 @@ export class AdminDashboard {
         this.registeredStudents = [];
         this.configManager = configManager;
         this.currentReportData = null; 
-        // --- CORRECTED: The class counting and DB sync will both start from the upcoming Monday ---
         this.classStartDate = this.getNextMonday();
     }
 
-    /**
-     * Calculates the date of the next Monday to be used as the official start.
-     * @returns {Date} - The date object for the upcoming Monday.
-     */
     getNextMonday() {
         const date = new Date();
-        const today = date.getDay(); // Sunday is 0, Monday is 1
+        const today = date.getDay();
         const offset = today === 0 ? 1 : (8 - today) % 7;
         const nextMonday = new Date(date);
         nextMonday.setDate(date.getDate() + offset);
@@ -34,14 +29,24 @@ export class AdminDashboard {
         await this.loadRegisteredStudents();
         this.setupReportListeners();
         this.setManualAttendanceDate();
+        this.setCancelDate();
     }
 
     setManualAttendanceDate() {
         const dateInput = document.getElementById('manualAttendanceDate');
         if (dateInput) {
             const today = new Date();
-            // --- NEW: Set max date to today to prevent future marking ---
             dateInput.max = today.toISOString().split('T')[0];
+            dateInput.value = today.toISOString().split('T')[0];
+        }
+    }
+
+    // --- NEW: Set min date for cancellation date picker ---
+    setCancelDate() {
+        const dateInput = document.getElementById('cancelDate');
+        if (dateInput) {
+            const today = new Date();
+            dateInput.min = today.toISOString().split('T')[0];
             dateInput.value = today.toISOString().split('T')[0];
         }
     }
@@ -198,7 +203,6 @@ export class AdminDashboard {
         modalContent.innerHTML = `<div id="modalLoader"><i class="fas fa-spinner fa-spin"></i><p>Calculating accurate attendance...</p></div>`;
     
         try {
-            // --- CORRECTED: Calculation starts from the official class start date ---
             const semesterStartDate = this.classStartDate;
             const today = new Date();
     
@@ -220,7 +224,6 @@ export class AdminDashboard {
             let totalAttendedClasses = 0;
             const sectionTimetable = this.configManager.getTimetable(student.section);
     
-            // Only loop if today is on or after the start date
             if (today >= semesterStartDate) {
                 for (let d = new Date(semesterStartDate); d <= today; d.setDate(d.getDate() + 1)) {
                     const dateStr = d.toISOString().split('T')[0];
@@ -285,7 +288,6 @@ export class AdminDashboard {
         const dateInput = document.getElementById('manualAttendanceDate');
         const dateStr = dateInput.value;
 
-        // --- NEW: Prevent marking attendance for future dates ---
         const selectedDate = new Date(dateStr + 'T23:59:59');
         if (selectedDate > new Date()) {
             Utils.showAlert("You cannot mark attendance for a future date.", 'danger');
@@ -345,41 +347,146 @@ export class AdminDashboard {
         }
     }
     
+    // --- REVAMPED: Smarter cancellation logic for a single class ---
     async cancelClass() {
-        const cancelDate = document.getElementById('cancelDate').value; 
+        const dateStr = document.getElementById('cancelDate').value; 
         const className = document.getElementById('cancelClassSelector').value;
+        const sectionId = document.getElementById('cancelSectionSelector').value;
 
-        if (!cancelDate || !className) {
-            Utils.showAlert('Please select both a date and a class to cancel.', 'warning');
+        if (!dateStr || !className) {
+            Utils.showAlert('Please select a date and a class to cancel.', 'warning');
             return;
         }
 
-        if (!confirm(`Are you sure you want to cancel "${className}" for ALL students on ${cancelDate}?`)) return;
-
-        Utils.showAlert('Processing cancellation for all registered students...', 'info');
-        
-        const cancellationPromises = this.registeredStudents.map(student => {
-            const attendanceRef = doc(db, "attendance", student.rollNumber, "records", cancelDate, "subjects", className);
-            return setDoc(attendanceRef, { status: 'cancelled', subject: className, markedBy: 'admin', timestamp: new Date() });
-        });
-        await Promise.all(cancellationPromises);
-
-        try {
-            const noticeRef = doc(db, "cancellations", cancelDate);
-            await setDoc(noticeRef, {
-                cancelledClasses: arrayUnion({ className: className, timestamp: new Date(), sections: ['A', 'B'] })
-            }, { merge: true });
-
-            Utils.showAlert(`Successfully cancelled "${className}" and sent notifications.`, 'success');
-        } catch (error) {
-            console.error("Failed to post cancellation notice:", error);
-            Utils.showAlert(`Cancellation saved, but failed to send notifications.`, 'warning');
+        const date = new Date(dateStr + 'T00:00:00');
+        const dayOfWeek = date.getDay();
+        if (dayOfWeek === 0 || dayOfWeek === 6 || holidays[dateStr]) {
+            Utils.showAlert(`Cannot cancel a class on a weekend or a holiday (${holidays[dateStr] || 'Weekend'}).`, 'warning');
+            return;
         }
+
+        const dayName = date.toLocaleString('en-US', { weekday: 'long' });
+        const sectionsToCheck = sectionId === 'All' ? ['A', 'B'] : [sectionId];
+        let isClassScheduled = false;
+
+        for (const sec of sectionsToCheck) {
+            const timetable = this.configManager.getTimetable(sec);
+            const daySchedule = timetable ? timetable[dayName] : null;
+            if (daySchedule && Object.values(daySchedule).some(slot => slot.subject === className)) {
+                isClassScheduled = true;
+                break;
+            }
+        }
+
+        if (!isClassScheduled) {
+            Utils.showAlert(`The class "${className}" is not scheduled for Section(s) ${sectionsToCheck.join(', ')} on ${dayName}.`, 'danger');
+            return;
+        }
+
+        if (!confirm(`Are you sure you want to cancel "${className}" for Section(s) ${sectionsToCheck.join(', ')} on ${dateStr}?`)) return;
+
+        const studentsToNotify = this.registeredStudents.filter(s => sectionsToCheck.includes(s.section));
+        if (studentsToNotify.length === 0) {
+            Utils.showAlert('No registered students found in the selected section(s).', 'info');
+            return;
+        }
+
+        Utils.showAlert('Processing cancellation...', 'info');
+        
+        const promises = studentsToNotify.map(student => {
+            const ref = doc(db, "attendance", student.rollNumber, "records", dateStr, "subjects", className);
+            return setDoc(ref, { status: 'cancelled', subject: className, markedBy: 'admin', timestamp: new Date() });
+        });
+        await Promise.all(promises);
+
+        const noticeRef = doc(db, "cancellations", dateStr);
+        await setDoc(noticeRef, {
+            cancelledClasses: arrayUnion({ className, timestamp: new Date(), sections: sectionsToCheck })
+        }, { merge: true });
+
+        Utils.showAlert(`Successfully cancelled "${className}" for the selected sections.`, 'success');
+    }
+
+    // --- NEW: Function to cancel all classes for an entire day ---
+    async cancelEntireDay() {
+        const dateStr = document.getElementById('cancelDate').value;
+        const sectionId = document.getElementById('cancelSectionSelector').value;
+
+        if (!dateStr) {
+            Utils.showAlert('Please select a date to cancel.', 'warning');
+            return;
+        }
+
+        const date = new Date(dateStr + 'T00:00:00');
+        const dayOfWeek = date.getDay();
+        if (dayOfWeek === 0 || dayOfWeek === 6 || holidays[dateStr]) {
+            Utils.showAlert(`Cannot cancel an entire day on a weekend or a holiday.`, 'warning');
+            return;
+        }
+
+        const dayName = date.toLocaleString('en-US', { weekday: 'long' });
+        const sectionsToCancel = sectionId === 'All' ? ['A', 'B'] : [sectionId];
+        let classesToCancelBySection = {};
+        let totalClassesToCancel = 0;
+
+        for (const sec of sectionsToCancel) {
+            const timetable = this.configManager.getTimetable(sec);
+            const daySchedule = timetable ? timetable[dayName] : null;
+            if (daySchedule) {
+                const dailyClasses = Object.values(daySchedule)
+                    .filter(slot => slot.type.toLowerCase() !== 'break' && !slot.subject.toLowerCase().includes('study'))
+                    .map(slot => slot.subject);
+                if (dailyClasses.length > 0) {
+                    classesToCancelBySection[sec] = [...new Set(dailyClasses)];
+                    totalClassesToCancel += classesToCancelBySection[sec].length;
+                }
+            }
+        }
+  if (totalClassesToCancel === 0) {
+            Utils.showAlert(`No classes are scheduled for Section(s) ${sectionsToCancel.join(', ')} on ${dayName}.`, 'info');
+            return;
+        }
+
+        if (!confirm(`This will cancel ${totalClassesToCancel} class(es) for Section(s) ${sectionsToCancel.join(', ')} on ${dateStr}. Are you sure?`)) return;
+
+        const studentsToNotify = this.registeredStudents.filter(s => sectionsToCancel.includes(s.section));
+        if (studentsToNotify.length === 0) {
+            Utils.showAlert('No students found for the selected section(s).', 'info');
+            return;
+        }
+
+        Utils.showAlert('Processing full-day cancellation...', 'info');
+        const promises = [];
+        const cancellationNotices = [];
+
+        for (const student of studentsToNotify) {
+            const studentClasses = classesToCancelBySection[student.section];
+            if (studentClasses) {
+                for (const className of studentClasses) {
+                    const ref = doc(db, "attendance", student.rollNumber, "records", dateStr, "subjects", className);
+                    promises.push(setDoc(ref, { status: 'cancelled', subject: className, markedBy: 'admin', timestamp: new Date() }));
+                }
+            }
+        }
+        
+        for (const [sec, classes] of Object.entries(classesToCancelBySection)) {
+            classes.forEach(className => {
+                cancellationNotices.push({ className, timestamp: new Date(), sections: [sec] });
+            });
+        }
+
+        await Promise.all(promises);
+
+        const noticeRef = doc(db, "cancellations", dateStr);
+        await setDoc(noticeRef, {
+            cancelledClasses: arrayUnion(...cancellationNotices)
+        }, { merge: true });
+
+        Utils.showAlert(`Successfully cancelled all classes for ${dateStr}.`, 'success');
     }
 
     async synchronizeAttendanceForDate(dateStr) {
         const date = new Date(dateStr + 'T00:00:00');
-        // --- CORRECTED: DB writing only starts from the official class start date ---
         if (date < this.classStartDate) {
             console.log(`Skipping DB write for ${dateStr} (before official start date).`);
             return;
