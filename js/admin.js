@@ -5,18 +5,51 @@ import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc } from "https://
 import { Utils } from './utils.js';
 
 export class AdminDashboard {
-    constructor() {
+    // --- UPDATED: Accept configManager in constructor ---
+    constructor(configManager) {
         this.registeredStudents = [];
+        this.configManager = configManager; // Store the config manager instance
     }
 
     async init() {
+        this.populateClassSelectors(); // Populate dropdowns first
         await this.loadRegisteredStudents();
+    }
+
+    // --- NEW FUNCTION: To populate subject dropdowns dynamically ---
+    populateClassSelectors() {
+        const subjects = this.configManager.getSubjects();
+        const qrSelector = document.getElementById('classSelector');
+        const manualSelector = document.getElementById('manualClassSelector');
+
+        // Clear existing placeholder options
+        qrSelector.innerHTML = '';
+        manualSelector.innerHTML = '';
+
+        if (subjects.length === 0) {
+            const defaultOption = '<option value="">No subjects found in config</option>';
+            qrSelector.innerHTML = defaultOption;
+            manualSelector.innerHTML = defaultOption;
+            return;
+        }
+
+        subjects.forEach(subject => {
+            // Create a display-friendly name like "CS501 - Theory of Computation"
+            const subjectName = `${subject.code} - ${subject.name}`;
+            const option = document.createElement('option');
+            option.value = subjectName;
+            option.textContent = subjectName;
+            
+            // Add the same option to both dropdowns
+            qrSelector.appendChild(option.cloneNode(true));
+            manualSelector.appendChild(option);
+        });
     }
 
     async loadRegisteredStudents() {
         console.log("Admin: Fetching registered devices...");
         const devicesSnap = await getDocs(collection(db, "devices"));
-        
+
         const studentPromises = devicesSnap.docs.map(async (deviceDoc) => {
             const deviceData = deviceDoc.data();
             if (!deviceData.rollNumber) {
@@ -84,11 +117,10 @@ export class AdminDashboard {
         }
     }
 
-    // --- UPDATED FUNCTION ---
     async markManualAttendance() {
         const rollNumber = document.getElementById('manualRollNumber').value;
         const status = document.getElementById('attendanceStatus').value;
-        const className = document.getElementById('manualClassSelector').value; // Get class name
+        const className = document.getElementById('manualClassSelector').value;
 
         if (!rollNumber) {
             Utils.showAlert('Please enter a roll number.', 'warning');
@@ -100,7 +132,6 @@ export class AdminDashboard {
         }
 
         const today = new Date().toISOString().split('T')[0];
-        // Updated Firestore path to be more specific: includes a subcollection for subjects
         const attendanceRef = doc(db, "attendance", rollNumber, "records", today, "subjects", className);
         
         await setDoc(attendanceRef, { 
@@ -117,9 +148,9 @@ export class AdminDashboard {
     async clearAllDeviceData() {
         if(confirm("DANGER: This will de-register ALL devices. Are you sure?")) {
             const devicesSnap = await getDocs(collection(db, "devices"));
-            devicesSnap.forEach(async (doc) => {
-                await deleteDoc(doc.ref);
-            });
+            for (const deviceDoc of devicesSnap.docs) {
+                await deleteDoc(deviceDoc.ref);
+            }
             Utils.showAlert('All device data cleared!', 'success');
             await this.loadRegisteredStudents();
         }
@@ -135,6 +166,5 @@ export class AdminDashboard {
         }
         Utils.showAlert(`Generating ${reportType} report for ${reportDate}...`, 'info');
         console.log(`Generating report with type: ${reportType} and date: ${reportDate}`);
-        // Logic for fetching data and creating a CSV will be added here later.
     }
 }
