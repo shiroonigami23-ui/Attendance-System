@@ -1,14 +1,14 @@
 // js/admin.js
 
 import { db } from './firebase-config.js';
-import { collection, getDocs, doc, setDoc, getDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+import { collection, getDocs, doc, setDoc, getDoc, updateDoc, deleteDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 import { Utils } from './utils.js';
+import { holidays } from './holidays.js';
 
 export class AdminDashboard {
     constructor(configManager) {
         this.registeredStudents = [];
         this.configManager = configManager;
-        // --- NEW: To store the current report data for export ---
         this.currentReportData = null; 
     }
 
@@ -65,8 +65,7 @@ export class AdminDashboard {
         const subjects = this.configManager.getSubjects();
         const selectors = [
             document.getElementById('manualClassSelector'),
-            document.getElementById('cancelClassSelector'),
-            document.getElementById('classSelector')
+            document.getElementById('cancelClassSelector')
         ];
 
         selectors.forEach(selector => {
@@ -247,6 +246,7 @@ export class AdminDashboard {
         }
     }
     
+    // --- UPDATED to post a public cancellation notice ---
     async cancelClass() {
         const cancelDate = document.getElementById('cancelDate').value; 
         const className = document.getElementById('cancelClassSelector').value;
@@ -260,6 +260,7 @@ export class AdminDashboard {
 
         Utils.showAlert('Processing cancellation for all registered students...', 'info');
         
+        // Step 1: Mark attendance as 'cancelled' for every student
         const cancellationPromises = this.registeredStudents.map(student => {
             const attendanceRef = doc(db, "attendance", student.rollNumber, "records", cancelDate, "subjects", className);
             return setDoc(attendanceRef, {
@@ -269,16 +270,31 @@ export class AdminDashboard {
                 markedBy: 'admin'
             });
         });
-
         await Promise.all(cancellationPromises);
-        Utils.showAlert(`Successfully cancelled "${className}" for all students on ${cancelDate}.`, 'success');
+
+        // Step 2: Post a single public notice for the student apps to find
+        try {
+            const noticeRef = doc(db, "cancellations", cancelDate);
+            await setDoc(noticeRef, {
+                cancelledClasses: arrayUnion({
+                    className: className,
+                    timestamp: new Date(),
+                    sections: ['A', 'B'] // Assuming it's for all sections
+                })
+            }, { merge: true }); // Merge to avoid overwriting other cancellations on the same day
+
+            Utils.showAlert(`Successfully cancelled "${className}" and sent notifications.`, 'success');
+        } catch (error) {
+            console.error("Failed to post cancellation notice:", error);
+            Utils.showAlert(`Cancellation saved, but failed to send notifications.`, 'warning');
+        }
     }
 
     async generateClassReport() {
         const reportType = document.getElementById('reportType').value;
         const reportDisplay = document.getElementById('reportDisplay');
         reportDisplay.innerHTML = `<p class="text-center p-3">Generating report, please wait...</p>`;
-        this.currentReportData = null; // Clear previous report data
+        this.currentReportData = null;
 
         if (this.registeredStudents.length === 0) {
             await this.loadRegisteredStudents();
@@ -332,7 +348,6 @@ export class AdminDashboard {
             rec.timestamp ? new Date(rec.timestamp.toDate()).toLocaleTimeString() : 'N/A'
         ]);
         
-        // --- Store data for export ---
         this.currentReportData = {
             title: `Daily_Report_${dateStr}`,
             headers: headers,
@@ -388,7 +403,6 @@ export class AdminDashboard {
             return [rollNumber, stats.username, stats.section, stats.present, stats.total, `<span class="status-badge ${badgeClass}">${percentage}%</span>`];
         }).filter(row => row !== null);
 
-        // --- Store data for export ---
         this.currentReportData = {
             title: `Weekly_Report_${year}_W${week}`,
             headers: headers,
@@ -452,7 +466,6 @@ export class AdminDashboard {
 
         const monthName = new Date(year, month - 1).toLocaleString('default', { month: 'long' });
         
-        // --- Store data for export ---
          this.currentReportData = {
             title: `Defaulter_Report_${monthName}_${year}`,
             headers: headers,
@@ -497,7 +510,6 @@ export class AdminDashboard {
         reportDisplay.innerHTML = tableHTML;
     }
 
-    // --- NEW: Function to handle exporting the current report ---
     exportCurrentReport() {
         if (!this.currentReportData || !this.currentReportData.rows || this.currentReportData.rows.length === 0) {
             Utils.showAlert('No report generated to export. Please generate a report first.', 'warning');
@@ -506,7 +518,6 @@ export class AdminDashboard {
 
         const { title, headers, rows } = this.currentReportData;
 
-        // Sanitize data for CSV: ensure no commas in data and quote if necessary
         const sanitizeRow = row => row.map(cell => {
             const cellStr = String(cell).replace(/"/g, '""');
             return `"${cellStr}"`;
