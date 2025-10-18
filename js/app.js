@@ -118,6 +118,8 @@ window.markManualAttendance = () => window.app.adminDashboard.markManualAttendan
 window.clearDeviceData = () => window.app.adminDashboard.clearAllDeviceData();
 window.refreshAdminData = () => window.app.adminDashboard.loadRegisteredStudents();
 window.generateClassReport = () => window.app.adminDashboard.generateClassReport();
+// --- NEW GLOBAL FUNCTION ---
+window.cancelClass = () => window.app.adminDashboard.cancelClass();
 
 
 document.addEventListener('DOMContentLoaded', () => {
