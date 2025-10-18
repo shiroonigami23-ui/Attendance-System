@@ -10,12 +10,12 @@ export class AdminDashboard {
         this.registeredStudents = [];
         this.configManager = configManager;
         this.currentReportData = null; 
-        // --- NEW: Set the date from which synchronization will write to the DB ---
-        this.syncStartDate = this.getNextMonday();
+        // --- CORRECTED: The class counting and DB sync will both start from the upcoming Monday ---
+        this.classStartDate = this.getNextMonday();
     }
 
     /**
-     * Calculates the date of the next Monday.
+     * Calculates the date of the next Monday to be used as the official start.
      * @returns {Date} - The date object for the upcoming Monday.
      */
     getNextMonday() {
@@ -24,11 +24,10 @@ export class AdminDashboard {
         const offset = today === 0 ? 1 : (8 - today) % 7;
         const nextMonday = new Date(date);
         nextMonday.setDate(date.getDate() + offset);
-        nextMonday.setHours(0, 0, 0, 0); // Set to the beginning of the day
-        console.log(`Synchronization will start writing to DB from: ${nextMonday.toDateString()}`);
+        nextMonday.setHours(0, 0, 0, 0); 
+        console.log(`Official class start date set to: ${nextMonday.toDateString()}`);
         return nextMonday;
     }
-
 
     async init() {
         this.populateClassSelectors();
@@ -40,7 +39,10 @@ export class AdminDashboard {
     setManualAttendanceDate() {
         const dateInput = document.getElementById('manualAttendanceDate');
         if (dateInput) {
-            dateInput.value = new Date().toISOString().split('T')[0];
+            const today = new Date();
+            // --- NEW: Set max date to today to prevent future marking ---
+            dateInput.max = today.toISOString().split('T')[0];
+            dateInput.value = today.toISOString().split('T')[0];
         }
     }
     
@@ -63,16 +65,16 @@ export class AdminDashboard {
 
         switch (reportType) {
             case 'daily':
-                html = `<label for="reportDateInput">Date</label><input type="date" id="reportDateInput" class="form-control" value="${todayStr}">`;
+                html = `<label for="reportDateInput">Date</label><input type="date" id="reportDateInput" class="form-control" value="${todayStr}" max="${todayStr}">`;
                 break;
             case 'weekly':
                 const week = Math.ceil((((today - new Date(today.getFullYear(), 0, 1)) / 86400000) + new Date(today.getFullYear(), 0, 1).getDay() + 1) / 7);
                 const weekStr = `${today.getFullYear()}-W${String(week).padStart(2, '0')}`;
-                html = `<label for="reportWeekInput">Week</label><input type="week" id="reportWeekInput" class="form-control" value="${weekStr}">`;
+                html = `<label for="reportWeekInput">Week</label><input type="week" id="reportWeekInput" class="form-control" value="${weekStr}" max="${weekStr}">`;
                 break;
             case 'monthly':
                 const monthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-                html = `<label for="reportMonthInput">Month</label><input type="month" id="reportMonthInput" class="form-control" value="${monthStr}">`;
+                html = `<label for="reportMonthInput">Month</label><input type="month" id="reportMonthInput" class="form-control" value="${monthStr}" max="${monthStr}">`;
                 break;
         }
         dateInputContainer.innerHTML = html;
@@ -196,10 +198,10 @@ export class AdminDashboard {
         modalContent.innerHTML = `<div id="modalLoader"><i class="fas fa-spinner fa-spin"></i><p>Calculating accurate attendance...</p></div>`;
     
         try {
-            const semesterStartDate = new Date('2025-08-01T00:00:00'); 
+            // --- CORRECTED: Calculation starts from the official class start date ---
+            const semesterStartDate = this.classStartDate;
             const today = new Date();
     
-            // 1. Fetch all existing attendance records for the student ONCE.
             const attendanceMap = new Map();
             const recordsCol = collection(db, "attendance", rollNumber, "records");
             const dateSnapshot = await getDocs(recordsCol);
@@ -214,41 +216,37 @@ export class AdminDashboard {
                 attendanceMap.set(dateDoc.id, subjectsMap);
             }
     
-            // 2. Calculate total scheduled and attended classes by iterating through the calendar.
             let totalScheduledClasses = 0;
             let totalAttendedClasses = 0;
             const sectionTimetable = this.configManager.getTimetable(student.section);
     
-            for (let d = new Date(semesterStartDate); d <= today; d.setDate(d.getDate() + 1)) {
-                const dateStr = d.toISOString().split('T')[0];
-                const dayOfWeek = d.getDay();
+            // Only loop if today is on or after the start date
+            if (today >= semesterStartDate) {
+                for (let d = new Date(semesterStartDate); d <= today; d.setDate(d.getDate() + 1)) {
+                    const dateStr = d.toISOString().split('T')[0];
+                    const dayOfWeek = d.getDay();
     
-                if (dayOfWeek === 0 || dayOfWeek === 6 || holidays[dateStr]) {
-                    continue; // Skip weekends and holidays
-                }
+                    if (dayOfWeek === 0 || dayOfWeek === 6 || holidays[dateStr]) continue;
     
-                const dayName = d.toLocaleString('en-US', { weekday: 'long' });
-                const daySchedule = sectionTimetable ? sectionTimetable[dayName] : null;
+                    const dayName = d.toLocaleString('en-US', { weekday: 'long' });
+                    const daySchedule = sectionTimetable ? sectionTimetable[dayName] : null;
     
-                if (daySchedule) {
-                    const dailyAttendance = attendanceMap.get(dateStr);
+                    if (daySchedule) {
+                        const dailyAttendance = attendanceMap.get(dateStr);
+                        for (const slot of Object.values(daySchedule)) {
+                            if (slot.type.toLowerCase() === 'break' || slot.subject.toLowerCase().includes('study')) continue;
+                            
+                            totalScheduledClasses++;
+                            const record = dailyAttendance ? dailyAttendance.get(slot.subject) : null;
     
-                    for (const slot of Object.values(daySchedule)) {
-                        if (slot.type.toLowerCase() === 'break' || slot.subject.toLowerCase().includes('study')) {
-                            continue;
-                        }
-    
-                        totalScheduledClasses++;
-                        const record = dailyAttendance ? dailyAttendance.get(slot.subject) : null;
-    
-                        if (record && (record.status === 'present' || record.status === 'late')) {
-                            totalAttendedClasses++;
+                            if (record && (record.status === 'present' || record.status === 'late')) {
+                                totalAttendedClasses++;
+                            }
                         }
                     }
                 }
             }
     
-            // 3. Render the result.
             const percentage = totalScheduledClasses > 0 ? Math.round((totalAttendedClasses / totalScheduledClasses) * 100) : 0;
             const badgeClass = percentage >= 75 ? 'text-success' : percentage >= 60 ? 'text-warning' : 'text-danger';
     
@@ -287,24 +285,33 @@ export class AdminDashboard {
         const dateInput = document.getElementById('manualAttendanceDate');
         const dateStr = dateInput.value;
 
+        // --- NEW: Prevent marking attendance for future dates ---
+        const selectedDate = new Date(dateStr + 'T23:59:59');
+        if (selectedDate > new Date()) {
+            Utils.showAlert("You cannot mark attendance for a future date.", 'danger');
+            return;
+        }
+
         if (!rollNumber || !className || !dateStr) {
             Utils.showAlert('Please select a date, roll number, and class.', 'warning');
             return;
         }
 
-        const selectedDate = new Date(dateStr + 'T00:00:00');
         const student = this.registeredStudents.find(s => s.rollNumber === rollNumber);
         if (!student) {
             Utils.showAlert(`Student with roll number ${rollNumber} not found.`, 'danger');
             return;
         }
-        const dayOfWeek = selectedDate.toLocaleString('en-US', { weekday: 'long' });
+        
+        const dayOfWeek = new Date(dateStr + 'T00:00:00').toLocaleString('en-US', { weekday: 'long' });
         const timetable = this.configManager.getTimetable(student.section);
         const daySchedule = timetable ? timetable[dayOfWeek] : null;
+
         if (!daySchedule) {
             Utils.showAlert(`No classes are scheduled on ${dayOfWeek} for Section ${student.section}.`, 'warning');
             return;
         }
+        
         const classCode = className.split(' - ')[0].replace(/\s/g, '');
         const isClassScheduled = Object.values(daySchedule).some(slot => slot.subject.replace(/\s/g, '').includes(classCode));
         if (!isClassScheduled) {
@@ -316,29 +323,19 @@ export class AdminDashboard {
         
         try {
             const docSnap = await getDoc(attendanceRef);
-
             if (docSnap.exists()) {
-                const existingStatus = docSnap.data().status;
-                if (existingStatus === newStatus) {
-                    Utils.showAlert(`Student is already marked as '${existingStatus}'. No change needed.`, 'info');
+                const existingData = docSnap.data();
+                if (existingData.status === newStatus) {
+                    Utils.showAlert(`Student is already marked as '${newStatus}'. No change needed.`, 'info');
                     return;
                 }
                 
-                if (confirm(`A record already exists with status '${existingStatus}'. Do you want to change it to '${newStatus}'?`)) {
-                    await updateDoc(attendanceRef, {
-                        status: newStatus,
-                        timestamp: new Date(),
-                        markedBy: 'admin'
-                    });
+                if (confirm(`A record by '${existingData.markedBy}' already exists with status '${existingData.status}'. Change to '${newStatus}'?`)) {
+                    await updateDoc(attendanceRef, { status: newStatus, markedBy: 'admin', timestamp: new Date() });
                     Utils.showAlert('Attendance record updated successfully!', 'success');
                 }
             } else {
-                await setDoc(attendanceRef, {
-                    status: newStatus,
-                    subject: className,
-                    timestamp: new Date(),
-                    markedBy: 'admin'
-                });
+                await setDoc(attendanceRef, { status: newStatus, subject: className, markedBy: 'admin', timestamp: new Date() });
                 Utils.showAlert(`Attendance marked successfully for ${rollNumber}!`, 'success');
             }
              document.getElementById('manualRollNumber').value = '';
@@ -363,23 +360,14 @@ export class AdminDashboard {
         
         const cancellationPromises = this.registeredStudents.map(student => {
             const attendanceRef = doc(db, "attendance", student.rollNumber, "records", cancelDate, "subjects", className);
-            return setDoc(attendanceRef, {
-                status: 'cancelled',
-                subject: className,
-                timestamp: new Date(),
-                markedBy: 'admin'
-            });
+            return setDoc(attendanceRef, { status: 'cancelled', subject: className, markedBy: 'admin', timestamp: new Date() });
         });
         await Promise.all(cancellationPromises);
 
         try {
             const noticeRef = doc(db, "cancellations", cancelDate);
             await setDoc(noticeRef, {
-                cancelledClasses: arrayUnion({
-                    className: className,
-                    timestamp: new Date(),
-                    sections: ['A', 'B']
-                })
+                cancelledClasses: arrayUnion({ className: className, timestamp: new Date(), sections: ['A', 'B'] })
             }, { merge: true });
 
             Utils.showAlert(`Successfully cancelled "${className}" and sent notifications.`, 'success');
@@ -390,10 +378,10 @@ export class AdminDashboard {
     }
 
     async synchronizeAttendanceForDate(dateStr) {
-        // --- MODIFIED: Only write to DB if the date is on or after the sync start date ---
         const date = new Date(dateStr + 'T00:00:00');
-        if (date < this.syncStartDate) {
-            console.log(`Skipping DB write for ${dateStr} (before sync start date).`);
+        // --- CORRECTED: DB writing only starts from the official class start date ---
+        if (date < this.classStartDate) {
+            console.log(`Skipping DB write for ${dateStr} (before official start date).`);
             return;
         }
 
@@ -401,65 +389,46 @@ export class AdminDashboard {
         if (reportDisplay) reportDisplay.innerHTML = `<p class="text-center p-3"><i class="fas fa-sync-alt fa-spin"></i> Synchronizing attendance records for ${dateStr}...</p>`;
 
         const dayOfWeek = date.getDay();
-
-        if (dayOfWeek === 0 || dayOfWeek === 6 || holidays[dateStr]) {
-            return;
-        }
+        if (dayOfWeek === 0 || dayOfWeek === 6 || holidays[dateStr]) return;
 
         const dayName = date.toLocaleString('en-US', { weekday: 'long' });
 
         for (const sectionId of ['A', 'B']) {
             const sectionTimetable = this.configManager.getTimetable(sectionId);
             const daySchedule = sectionTimetable ? sectionTimetable[dayName] : null;
-
             if (!daySchedule) continue;
 
             const studentsInSection = this.registeredStudents.filter(s => s.section === sectionId);
             if (studentsInSection.length === 0) continue;
 
-            const scheduledClasses = Object.values(daySchedule)
+            const uniqueClasses = [...new Set(Object.values(daySchedule)
                 .filter(slot => slot.type.toLowerCase() !== 'break' && !slot.subject.toLowerCase().includes('study'))
-                .map(slot => slot.subject);
-
-            const uniqueClasses = [...new Set(scheduledClasses)];
+                .map(slot => slot.subject))];
 
             for (const className of uniqueClasses) {
                 for (const student of studentsInSection) {
                     const attendanceRef = doc(db, "attendance", student.rollNumber, "records", dateStr, "subjects", className);
                     const docSnap = await getDoc(attendanceRef);
                     if (!docSnap.exists()) {
-                        await setDoc(attendanceRef, {
-                            status: 'absent',
-                            subject: className,
-                            timestamp: new Date(),
-                            markedBy: 'system'
-                        });
+                        await setDoc(attendanceRef, { status: 'absent', subject: className, markedBy: 'system', timestamp: new Date() });
                     }
                 }
             }
         }
     }
 
-     async generateClassReport() {
+    async generateClassReport() {
         const reportType = document.getElementById('reportType').value;
         const reportDisplay = document.getElementById('reportDisplay');
         reportDisplay.innerHTML = `<p class="text-center p-3">Generating report, please wait...</p>`;
         this.currentReportData = null;
 
-        if (this.registeredStudents.length === 0) {
-            await this.loadRegisteredStudents();
-        }
+        if (this.registeredStudents.length === 0) await this.loadRegisteredStudents();
         
         switch (reportType) {
-            case 'daily':
-                await this.generateDailyReport();
-                break;
-            case 'weekly':
-                await this.generateWeeklyReport();
-                break;
-            case 'monthly':
-                await this.generateMonthlyReport();
-                break;
+            case 'daily': await this.generateDailyReport(); break;
+            case 'weekly': await this.generateWeeklyReport(); break;
+            case 'monthly': await this.generateMonthlyReport(); break;
         }
     }
 
@@ -480,22 +449,14 @@ export class AdminDashboard {
             const subjectSnapshot = await getDocs(subjectsCol);
             if (!subjectSnapshot.empty) {
                 subjectSnapshot.forEach(doc => {
-                    records.push({
-                        rollNumber: student.rollNumber,
-                        username: student.username,
-                        section: student.section,
-                        ...doc.data()
-                    });
+                    records.push({ rollNumber: student.rollNumber, username: student.username, section: student.section, ...doc.data() });
                 });
             }
         }
 
         const headers = ['Roll No', 'Name', 'Section', 'Subject', 'Status', 'Marked By', 'Time'];
         const rows = records.map(rec => [
-            rec.rollNumber,
-            rec.username,
-            rec.section,
-            rec.subject,
+            rec.rollNumber, rec.username, rec.section, rec.subject,
             `<span class="status-badge status-${rec.status}">${rec.status}</span>`,
             rec.markedBy || 'N/A',
             rec.timestamp ? new Date(rec.timestamp.toDate()).toLocaleTimeString() : 'N/A'
@@ -527,9 +488,7 @@ export class AdminDashboard {
             return targetDate.toISOString().split('T')[0];
         });
 
-        for (const dateStr of dates) {
-            await this.synchronizeAttendanceForDate(dateStr);
-        }
+        for (const dateStr of dates) await this.synchronizeAttendanceForDate(dateStr);
 
         const studentStats = {};
         this.registeredStudents.forEach(s => {
@@ -544,21 +503,19 @@ export class AdminDashboard {
                     const data = doc.data();
                     if (data.status !== 'cancelled') {
                         studentStats[student.rollNumber].total++;
-                        if (data.status === 'present' || data.status === 'late') {
-                            studentStats[student.rollNumber].present++;
-                        }
+                        if (data.status === 'present' || data.status === 'late') studentStats[student.rollNumber].present++;
                     }
                 });
             }
         }
         
-        const headers = ['Roll No', 'Name', 'Section', 'Classes Attended', 'Total Classes', 'Percentage'];
+        const headers = ['Roll No', 'Name', 'Section', 'Attended', 'Total', 'Percentage'];
         const rows = Object.entries(studentStats).map(([rollNumber, stats]) => {
             if (stats.total === 0) return null;
             const percentage = Math.round((stats.present / stats.total) * 100);
             const badgeClass = percentage >= 75 ? 'status-present' : percentage >= 60 ? 'status-late' : 'status-absent';
             return [rollNumber, stats.username, stats.section, stats.present, stats.total, `<span class="status-badge ${badgeClass}">${percentage}%</span>`];
-        }).filter(row => row !== null);
+        }).filter(Boolean);
 
         this.currentReportData = {
             title: `Weekly_Report_${year}_W${week}`,
@@ -567,7 +524,7 @@ export class AdminDashboard {
                 if (stats.total === 0) return null;
                 const percentage = Math.round((stats.present / stats.total) * 100);
                 return [rollNumber, stats.username, stats.section, stats.present, stats.total, `${percentage}%`];
-            }).filter(row => row !== null)
+            }).filter(Boolean)
         };
 
         this.renderReport(`Weekly Report for Week ${week}, ${year}`, headers, rows);
@@ -589,9 +546,7 @@ export class AdminDashboard {
             dates.push(new Date(d).toISOString().split('T')[0]);
         }
 
-        for (const dateStr of dates) {
-            await this.synchronizeAttendanceForDate(dateStr);
-        }
+        for (const dateStr of dates) await this.synchronizeAttendanceForDate(dateStr);
 
         const studentStats = {};
         this.registeredStudents.forEach(s => {
@@ -606,9 +561,7 @@ export class AdminDashboard {
                     const data = doc.data();
                     if (data.status !== 'cancelled') {
                         studentStats[student.rollNumber].total++;
-                        if (data.status === 'present' || data.status === 'late') {
-                            studentStats[student.rollNumber].present++;
-                        }
+                        if (data.status === 'present' || data.status === 'late') studentStats[student.rollNumber].present++;
                     }
                 });
             }
