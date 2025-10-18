@@ -11,12 +11,16 @@ export class StudentDashboard {
         this.currentSection = 'A';
         this.attendanceHistory = {};
         this.calendarDisplayDate = new Date();
+        this.notifiedWindows = new Set(); // To prevent spamming notifications
+        this.notifiedCancellations = new Set();
     }
 
     async init(userData) {
         this.currentUser = userData;
         this.currentSection = userData.section;
         this.calendarDisplayDate = new Date();
+
+        await Utils.requestNotificationPermission(); // Ask for permission on login
 
         this.renderHeader();
         this.displayDayStatusMessage();
@@ -27,8 +31,10 @@ export class StudentDashboard {
         this.renderSubjectAttendance();
         this.renderAttendanceCalendar();
 
-        setInterval(() => this.checkAttendanceWindow(), 30000);
+        setInterval(() => this.checkAttendanceWindow(), 30000); // Check every 30 seconds
+        setInterval(() => this.checkForCancellations(), 60000); // Check every minute
         this.checkAttendanceWindow();
+        this.checkForCancellations();
     }
 
     renderHeader() {
@@ -341,22 +347,25 @@ export class StudentDashboard {
 
                 const [startTimeStr, endTimeStr] = timeSlot.split('-');
                 const [startHour, startMinute] = startTimeStr.split(':').map(Number);
-                const [endHour, endMinute] = endTimeStr.split(':').map(Number);
                 
                 const classStart = new Date();
                 classStart.setHours(startHour, startMinute, 0, 0);
 
-                const classEnd = new Date();
-                classEnd.setHours(endHour, endMinute, 0, 0);
-
-                // --- ADJUSTED WINDOW LOGIC ---
-                // Window opens at the start of the class and closes 5 minutes after.
                 const windowStart = classStart;
-                const windowEnd = new Date(classEnd.getTime() + 5 * 60000);
+                const windowEnd = new Date(classStart.getTime() + 5 * 60000);
 
                 if (now >= windowStart && now <= windowEnd) {
                     isWindowOpen = true;
                     windowMessage.textContent = `Window for ${classInfo.subject} is OPEN until ${Utils.formatTime(windowEnd)}!`;
+
+                    // --- NEW: Send Notification if window just opened ---
+                    const notificationId = `${now.toISOString().split('T')[0]}-${timeSlot}`;
+                    if (!this.notifiedWindows.has(notificationId)) {
+                        Utils.showNotification('Attendance Window Open!', {
+                            body: `Time to mark your attendance for ${classInfo.subject}.`
+                        });
+                        this.notifiedWindows.add(notificationId);
+                    }
                     break;
                 }
             }
@@ -373,7 +382,6 @@ export class StudentDashboard {
         }
     }
 
-    // --- NEW: Implemented "Tap to Scan" Logic ---
     async markAttendance() {
         const qrScanner = document.getElementById('qrScanner');
         if (qrScanner.classList.contains('disabled')) {
@@ -390,19 +398,14 @@ export class StudentDashboard {
 
         if (daySchedule) {
             for (const [timeSlot, classInfo] of Object.entries(daySchedule)) {
-                 const [startTimeStr, endTimeStr] = timeSlot.split('-');
+                 const [startTimeStr] = timeSlot.split('-');
                  const [startHour, startMinute] = startTimeStr.split(':').map(Number);
-                 const [endHour, endMinute] = endTimeStr.split(':').map(Number);
                 
                 const classStart = new Date();
                 classStart.setHours(startHour, startMinute, 0, 0);
-                const classEnd = new Date();
-                classEnd.setHours(endHour, endMinute, 0, 0);
+                const windowEnd = new Date(classStart.getTime() + 5 * 60000);
 
-                const windowStart = classStart;
-                const windowEnd = new Date(classEnd.getTime() + 5 * 60000);
-
-                if (now >= windowStart && now <= windowEnd) {
+                if (now >= classStart && now <= windowEnd) {
                     currentClassInfo = classInfo;
                     break;
                 }
@@ -433,7 +436,6 @@ export class StudentDashboard {
             });
 
             Utils.showAlert(`Attendance marked for ${className}!`, 'success');
-            // Refresh data after marking
             await this.fetchAttendanceHistory();
             this.updateAttendanceStats();
             this.renderAttendanceLog();
@@ -444,9 +446,37 @@ export class StudentDashboard {
             Utils.showAlert('Failed to mark attendance. Please try again.', 'danger');
         }
     }
-
-
     
+// --- NEW: Checks for class cancellation notices ---
+    async checkForCancellations() {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const cancelRef = doc(db, "cancellations", todayStr);
+
+        try {
+            const docSnap = await getDoc(cancelRef);
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                if (data.cancelledClasses && Array.isArray(data.cancelledClasses)) {
+                    data.cancelledClasses.forEach(cancellation => {
+                        // Check if cancellation applies to this student's section
+                        if (cancellation.sections.includes(this.currentUser.section)) {
+                            const notificationId = `${todayStr}-${cancellation.className}`;
+                            if (!this.notifiedCancellations.has(notificationId)) {
+                                Utils.showNotification('Class Cancelled', {
+                                    body: `Your class "${cancellation.className}" has been cancelled today.`
+                                });
+                                this.notifiedCancellations.add(notificationId);
+                            }
+                        }
+                    });
+                }
+            }
+        } catch (error) {
+            console.error("Error checking for cancellations:", error);
+        }
+    }
+
+
     showAttendanceForDay(dateStr) {
         const dailyRecord = this.attendanceHistory[dateStr];
         const holiday = holidays[dateStr];
