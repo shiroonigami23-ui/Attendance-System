@@ -8,7 +8,8 @@ class AttendanceSystem {
         this.configManager = new ConfigManager();
         this.authManager = new AuthManager(this.configManager);
         this.studentDashboard = new StudentDashboard(this.configManager);
-        this.adminDashboard = new AdminDashboard();
+        // --- UPDATED: Pass configManager to AdminDashboard ---
+        this.adminDashboard = new AdminDashboard(this.configManager);
     }
 
     async init() {
@@ -116,8 +117,6 @@ window.switchSection = (sectionId) => window.app.studentDashboard.switchSection(
 window.markManualAttendance = () => window.app.adminDashboard.markManualAttendance();
 window.clearDeviceData = () => window.app.adminDashboard.clearAllDeviceData();
 window.refreshAdminData = () => window.app.adminDashboard.loadRegisteredStudents();
-
-// --- ADDED THIS LINE ---
 window.generateClassReport = () => window.app.adminDashboard.generateClassReport();
 
 
