@@ -124,7 +124,21 @@
                 </div>
 
                 <!-- Reports Tab -->
-                <div id="adminReportsTab" class="tab-panel"><h3 class="card-title">Generate Reports</h3><div class="form-group"><label>Report Type</label><select id="reportType" class="form-select"><option value="daily">Daily Attendance Report</option><option value="weekly">Weekly Summary</option><option value="monthly">Monthly Defaulter List</option></select></div><div class="form-group"><label>Date</label><input type="date" id="reportDate" class="form-control"></div><button class="btn btn-info" onclick="generateClassReport()"><i class="fas fa-chart-bar"></i> Generate Report</button></div>
+                <div id="adminReportsTab" class="tab-panel">
+                    <h3 class="card-title">Generate Reports</h3>
+                    <div class="form-group">
+                        <label>Report Type</label>
+                        <select id="reportType" class="form-select">
+                            <option value="daily">Daily Attendance Report</option>
+                            <option value="weekly">Weekly Summary</option>
+                            <option value="monthly">Monthly Defaulter List (&lt;75%)</option>
+                        </select>
+                    </div>
+                    <!-- This container will be dynamically filled by JS -->
+                    <div id="reportDateContainer" class="form-group"></div>
+                    <button class="btn btn-info" onclick="generateClassReport()"><i class="fas fa-chart-bar"></i> Generate Report</button>
+                    <div id="reportDisplay" class="mt-4"></div>
+                </div>
                 
                 <!-- Settings Tab -->
                 <div id="adminSettingsTab" class="tab-panel">
@@ -138,7 +152,6 @@
             </div>
         </div>
 
-        <!-- Device Warning -->
         <div id="deviceWarning" class="device-warning hidden">
              <div class="icon"><i class="fas fa-exclamation-triangle"></i></div>
              <h2>Device Mismatch</h2>
@@ -148,11 +161,6 @@
     </div>
 
     <!-- Scripts -->
-    <!-- 
-      FIXED: Removed conflicting Firebase compat scripts that were breaking the modern 'import' functionality.
-    -->
     <script type="module" src="js/app.js"></script>
 </body>
 </html>
-
-
