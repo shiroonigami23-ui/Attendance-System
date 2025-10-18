@@ -125,4 +125,22 @@ renderStudentTable() {
             await this.loadRegisteredStudents();
         }
     }
+
+    // --- ADDED THIS NEW FUNCTION ---
+    async generateClassReport() {
+        const reportType = document.getElementById('reportType').value;
+        const reportDate = document.getElementById('reportDate').value;
+
+        if (!reportDate) {
+            Utils.showAlert('Please select a date for the report.', 'warning');
+            return;
+        }
+
+        Utils.showAlert(`Generating ${reportType} report for ${reportDate}...`, 'info');
+        console.log(`Generating report with type: ${reportType} and date: ${reportDate}`);
+
+        // In a real application, you would add logic here to fetch data 
+        // from Firestore and generate a downloadable report (e.g., a CSV file).
+        // For now, this just shows an alert to confirm it's working.
+    }
 }
