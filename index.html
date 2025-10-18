@@ -109,11 +109,28 @@
 
                 <!-- Cancel Class Tab -->
                 <div id="adminCancelTab" class="tab-panel">
-                    <h3 class="card-title">Cancel a Class</h3>
-                    <p class="card-subtitle">Cancel a class for all students (e.g., holiday, event).</p>
-                    <div class="form-group"><label for="cancelDate">Date of Cancellation</label><input type="date" id="cancelDate" class="form-control"></div>
-                    <div class="form-group"><label for="cancelClassSelector">Select Class to Cancel</label><select id="cancelClassSelector" class="form-select"></select></div>
-                    <button class="btn btn-warning" onclick="cancelClass()"><i class="fas fa-calendar-times"></i> Cancel Class</button>
+                    <h3 class="card-title">Cancel a Class or an Entire Day</h3>
+                    <p class="card-subtitle">Cancel a scheduled class or all classes for a specific day.</p>
+                    <div class="form-group">
+                        <label for="cancelDate">Date of Cancellation</label>
+                        <input type="date" id="cancelDate" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="cancelSectionSelector">For Section</label>
+                        <select id="cancelSectionSelector" class="form-select">
+                            <option value="All">All Sections</option>
+                            <option value="A">Section A</option>
+                            <option value="B">Section B</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="cancelClassSelector">Select Class to Cancel (Optional)</label>
+                        <select id="cancelClassSelector" class="form-select"></select>
+                    </div>
+                    <div class="d-flex gap-3 flex-wrap">
+                        <button class="btn btn-warning" onclick="cancelClass()"><i class="fas fa-calendar-times"></i> Cancel Selected Class</button>
+                        <button class="btn btn-danger" onclick="cancelEntireDay()"><i class="fas fa-calendar-day"></i> Cancel Entire Day</button>
+                    </div>
                 </div>
 
                 <!-- Reports Tab -->
@@ -172,5 +189,4 @@
     <script type="module" src="js/app.js"></script>
 </body>
 </html>
-
 
