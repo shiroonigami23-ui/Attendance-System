@@ -86,7 +86,6 @@
                  <div class="nav-tabs">
                     <button class="nav-tab active" onclick="switchAdminTab('students')">Students</button>
                     <button class="nav-tab" onclick="switchAdminTab('attendance')">Attendance</button>
-                    <!-- NEW: Added 'Cancel Class' tab -->
                     <button class="nav-tab" onclick="switchAdminTab('cancel')">Cancel Class</button>
                     <button class="nav-tab" onclick="switchAdminTab('reports')">Reports</button>
                     <button class="nav-tab" onclick="switchAdminTab('settings')">Settings</button>
@@ -107,16 +106,22 @@
                         <div class="col-md-6">
                             <h3 class="card-title">Manual Attendance</h3>
                             <p class="card-subtitle">Mark attendance for a student manually.</p>
-                            <div class="form-group"><label>Roll Number</label><input type="text" id="manualRollNumber" class="form-control" placeholder="Student Roll Number"></div>
+                            <!-- NEW: Replaced text input with a searchable datalist input -->
+                            <div class="form-group">
+                                <label for="manualRollNumber">Roll Number</label>
+                                <input list="studentRollNumbers" id="manualRollNumber" class="form-control" placeholder="Type or select a Roll Number">
+                                <datalist id="studentRollNumbers">
+                                    <!-- Options will be populated by JavaScript -->
+                                </datalist>
+                            </div>
                             <div class="form-group"><label>Select Class</label><select id="manualClassSelector" class="form-select"></select></div>
                             <div class="form-group"><label>Status</label><select id="attendanceStatus" class="form-select"><option value="present">Present</option><option value="absent">Absent</option><option value="late">Late</option></select></div>
                             <button class="btn btn-primary" onclick="markManualAttendance()">Submit Attendance</button>
                         </div>
                     </div>
-                    <!-- MOVED: 'Cancel a Class' section moved to its own tab -->
                 </div>
 
-                <!-- NEW: 'Cancel Class' tab panel -->
+                <!-- 'Cancel Class' tab panel -->
                 <div id="adminCancelTab" class="tab-panel">
                     <div class="row">
                         <div class="col-md-6">
@@ -140,10 +145,8 @@
                             <option value="monthly">Monthly Defaulter List (&lt;75%)</option>
                         </select>
                     </div>
-                    <!-- This container will be dynamically filled by JS -->
                     <div id="reportDateContainer" class="form-group"></div>
                     <button class="btn btn-info" onclick="generateClassReport()"><i class="fas fa-chart-bar"></i> Generate Report</button>
-                    <!-- This is where the generated report table will be displayed -->
                     <div id="reportDisplay" class="mt-4"></div>
                 </div>
                 
