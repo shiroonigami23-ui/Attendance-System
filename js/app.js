@@ -132,6 +132,8 @@ window.refreshAdminData = () => window.app.adminDashboard.loadRegisteredStudents
 window.markManualAttendance = () => window.app.adminDashboard.markManualAttendance();
 window.cancelClass = () => window.app.adminDashboard.cancelClass();
 window.generateClassReport = () => window.app.adminDashboard.generateClassReport();
+// --- NEW: Hook up the Export CSV function ---
+window.exportStudentData = () => window.app.adminDashboard.exportStudentData();
 window.bulkLogout = () => window.app.adminDashboard.bulkLogout();
 window.clearDeviceData = () => window.app.adminDashboard.clearAllDeviceData();
 
