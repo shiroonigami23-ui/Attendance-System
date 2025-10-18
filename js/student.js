@@ -418,23 +418,26 @@ export class StudentDashboard {
     showAttendanceForDay(dateStr) {
         const dailyRecord = this.attendanceHistory[dateStr];
         const holiday = holidays[dateStr];
-        const dayOfWeek = new Date(dateStr + 'T00:00:00').getDay();
+        let message = ``;
+        const formattedDate = new Date(dateStr + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 
-        let message = '';
-        if (dailyRecord) {
-            if(dailyRecord.subjects && Object.keys(dailyRecord.subjects).length > 0) {
-                 message = `Attendance for ${dateStr}:<br>`;
-                 Object.values(dailyRecord.subjects).forEach(rec => {
-                    let statusText = `<strong>${rec.status.toUpperCase()}</strong>`;
-                    if (rec.status === 'cancelled') {
-                        statusText = `<em>${rec.status.toUpperCase()}</em>`;
-                    }
-                    message += `- ${rec.subject}: ${statusText}<br>`;
-                 });
-            } else if (dailyRecord.status) {
-                message = `General attendance for ${dateStr}: <strong>${dailyRecord.status.toUpperCase()}</strong>`;
-            } else {
-                 message = `No attendance records for ${dateStr}.`;
-            }
+        if (dailyRecord && dailyRecord.subjects && Object.keys(dailyRecord.subjects).length > 0) {
+            message = `Attendance for ${formattedDate}:<br>`;
+            Object.values(dailyRecord.subjects).forEach(rec => {
+                let statusText = `<strong>${rec.status.toUpperCase()}</strong>`;
+                if (rec.status === 'cancelled') {
+                    statusText = `<em>${rec.status.toUpperCase()}</em>`;
+                }
+                message += `- ${rec.subject}: ${statusText}<br>`;
+            });
+        } else if (dailyRecord && dailyRecord.status) {
+            message = `General attendance for ${formattedDate}: <strong>${dailyRecord.status.toUpperCase()}</strong>`;
         } else if (holiday) {
-            message 
+            message = `<strong>Holiday on ${formattedDate}:</strong> ${holiday}`;
+        } else {
+            message = `No attendance records for ${formattedDate}.`;
+        }
+        
+        Utils.showAlert(message, 'info', 10000);
+    }
+}
