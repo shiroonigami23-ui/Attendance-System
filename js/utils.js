@@ -81,7 +81,6 @@ export class ConfigManager {
     getRollNumberRanges() { return this.config?.rollNumbers || []; }
     getAdminCredentials() { return this.config?.admin || {}; }
     getTimetable(section) { return this.config?.timetable?.[section] || {}; }
-    // --- NEW: Getter for Subjects ---
     getSubjects() { return this.config?.subjects || []; }
 }
 
@@ -103,22 +102,37 @@ export const Utils = {
         }
         return `device_${Math.abs(hash)}`;
     },
-
+    
+    // --- UPDATED: Stricter Roll Number Validation ---
     isValidRollNumber(rollNumber, configManager) {
         if (!rollNumber) return false;
         const ranges = configManager.getRollNumberRanges();
+        
         for (const range of ranges) {
-            if (rollNumber.startsWith(range.prefix)) {
-                const numPart = rollNumber.substring(range.prefix.length);
-                const num = parseInt(numPart, 10);
-                const start = parseInt(range.start, 10);
-                const end = parseInt(range.end, 10);
-                if (!isNaN(num) && num >= start && num <= end) {
-                    return true;
-                }
+            // 1. Check if the roll number starts with the correct prefix
+            if (!rollNumber.startsWith(range.prefix)) {
+                continue; // Not this range, check the next one
+            }
+
+            // 2. Check if the total length is correct
+            // Example: prefix "0902CS231" (9) + start/end "001" (3) = 12 characters
+            const expectedLength = range.prefix.length + range.start.length;
+            if (rollNumber.length !== expectedLength) {
+                continue; // Length doesn't match, invalid
+            }
+
+            // 3. Check if the numeric part is within the allowed range
+            const numPart = rollNumber.substring(range.prefix.length);
+            const num = parseInt(numPart, 10);
+            const start = parseInt(range.start, 10);
+            const end = parseInt(range.end, 10);
+
+            if (!isNaN(num) && num >= start && num <= end) {
+                return true; // It's a valid roll number for this range
             }
         }
-        return false;
+        
+        return false; // If we get here, no range matched
     },
 
     showAlert(message, type = 'info', duration = 5000) {
