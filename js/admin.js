@@ -1,7 +1,7 @@
 // js/admin.js
 
 import { db } from './firebase-config.js';
-import { collection, getDocs, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+import { collection, getDocs, doc, setDoc, deleteDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 import { Utils } from './utils.js';
 
 export class AdminDashboard {
@@ -108,16 +108,14 @@ export class AdminDashboard {
 
         this.renderStudentTable();
         this.updateAdminStats();
-        // --- NEW: Populate the datalist after loading students ---
         this.populateRollNumberDatalist();
     }
-
-    // --- NEW: Populates the searchable datalist for manual attendance ---
+    
     populateRollNumberDatalist() {
         const datalist = document.getElementById('studentRollNumbers');
         if (!datalist) return;
 
-        datalist.innerHTML = ''; // Clear existing options
+        datalist.innerHTML = ''; 
         if (this.registeredStudents.length > 0) {
             this.registeredStudents.forEach(student => {
                 const option = document.createElement('option');
@@ -171,18 +169,52 @@ export class AdminDashboard {
         }
     }
 
+    // --- UPDATED with Timetable Validation ---
     async markManualAttendance() {
         const rollNumber = document.getElementById('manualRollNumber').value;
         const status = document.getElementById('attendanceStatus').value;
         const className = document.getElementById('manualClassSelector').value;
+        const today = new Date();
+        const dateStr = today.toISOString().split('T')[0];
 
         if (!rollNumber || !className) {
             Utils.showAlert('Please provide a roll number and select a class.', 'warning');
             return;
         }
 
-        const today = new Date().toISOString().split('T')[0];
-        const attendanceRef = doc(db, "attendance", rollNumber, "records", today, "subjects", className);
+        // --- VALIDATION LOGIC ---
+        // 1. Find the student to get their section
+        const student = this.registeredStudents.find(s => s.rollNumber === rollNumber);
+        if (!student) {
+            Utils.showAlert(`Student with roll number ${rollNumber} not found.`, 'danger');
+            return;
+        }
+        
+        // 2. Get the day of the week (e.g., 'Saturday')
+        const dayOfWeek = today.toLocaleString('en-US', { weekday: 'long' });
+
+        // 3. Get the timetable for that student's section
+        const timetable = this.configManager.getTimetable(student.section);
+        const daySchedule = timetable ? timetable[dayOfWeek] : null;
+
+        if (!daySchedule) {
+            Utils.showAlert(`No classes are scheduled on ${dayOfWeek} for Section ${student.section}.`, 'warning');
+            return;
+        }
+
+        // 4. Check if the selected class exists in that day's schedule
+        const classCode = className.split(' - ')[0]; // Extract 'CS501' from 'CS501 - Theory...'
+        const isClassScheduled = Object.values(daySchedule).some(slot => slot.subject.includes(classCode));
+
+        if (!isClassScheduled) {
+            Utils.showAlert(`The class "${className}" is not scheduled on ${dayOfWeek} for Section ${student.section}.`, 'warning');
+            return;
+        }
+        // --- END VALIDATION ---
+
+
+        // If validation passes, proceed to save the record
+        const attendanceRef = doc(db, "attendance", rollNumber, "records", dateStr, "subjects", className);
         
         await setDoc(attendanceRef, { 
             status, 
