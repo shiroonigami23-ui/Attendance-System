@@ -1,7 +1,7 @@
 // js/admin.js
 
 import { db } from './firebase-config.js';
-import { collection, getDocs, doc, setDoc, deleteDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+import { collection, getDocs, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 import { Utils } from './utils.js';
 
 export class AdminDashboard {
@@ -14,6 +14,16 @@ export class AdminDashboard {
         this.populateClassSelectors();
         await this.loadRegisteredStudents();
         this.setupReportListeners();
+        // --- NEW: Set default date for manual attendance ---
+        this.setManualAttendanceDate();
+    }
+
+    // --- NEW: Sets the manual attendance date input to today by default ---
+    setManualAttendanceDate() {
+        const dateInput = document.getElementById('manualAttendanceDate');
+        if (dateInput) {
+            dateInput.value = new Date().toISOString().split('T')[0];
+        }
     }
     
     setupReportListeners() {
@@ -169,31 +179,30 @@ export class AdminDashboard {
         }
     }
 
-    // --- UPDATED with Timetable Validation ---
+    // --- UPDATED with Date Picker and Timetable Validation ---
     async markManualAttendance() {
         const rollNumber = document.getElementById('manualRollNumber').value;
         const status = document.getElementById('attendanceStatus').value;
         const className = document.getElementById('manualClassSelector').value;
-        const today = new Date();
-        const dateStr = today.toISOString().split('T')[0];
+        // --- NEW: Read date from the new input field ---
+        const dateInput = document.getElementById('manualAttendanceDate');
+        const dateStr = dateInput.value;
 
-        if (!rollNumber || !className) {
-            Utils.showAlert('Please provide a roll number and select a class.', 'warning');
+        if (!rollNumber || !className || !dateStr) {
+            Utils.showAlert('Please select a date, roll number, and class.', 'warning');
             return;
         }
-
-        // --- VALIDATION LOGIC ---
-        // 1. Find the student to get their section
+        
+        // --- VALIDATION LOGIC using the selected date ---
+        const selectedDate = new Date(dateStr + 'T00:00:00'); // Use selected date
         const student = this.registeredStudents.find(s => s.rollNumber === rollNumber);
+
         if (!student) {
             Utils.showAlert(`Student with roll number ${rollNumber} not found.`, 'danger');
             return;
         }
         
-        // 2. Get the day of the week (e.g., 'Saturday')
-        const dayOfWeek = today.toLocaleString('en-US', { weekday: 'long' });
-
-        // 3. Get the timetable for that student's section
+        const dayOfWeek = selectedDate.toLocaleString('en-US', { weekday: 'long' });
         const timetable = this.configManager.getTimetable(student.section);
         const daySchedule = timetable ? timetable[dayOfWeek] : null;
 
@@ -202,18 +211,15 @@ export class AdminDashboard {
             return;
         }
 
-        // 4. Check if the selected class exists in that day's schedule
-        const classCode = className.split(' - ')[0]; // Extract 'CS501' from 'CS501 - Theory...'
+        const classCode = className.split(' - ')[0];
         const isClassScheduled = Object.values(daySchedule).some(slot => slot.subject.includes(classCode));
 
         if (!isClassScheduled) {
             Utils.showAlert(`The class "${className}" is not scheduled on ${dayOfWeek} for Section ${student.section}.`, 'warning');
             return;
         }
-        // --- END VALIDATION ---
 
-
-        // If validation passes, proceed to save the record
+        // If validation passes, proceed to save the record with the selected date
         const attendanceRef = doc(db, "attendance", rollNumber, "records", dateStr, "subjects", className);
         
         await setDoc(attendanceRef, { 
@@ -465,8 +471,7 @@ export class AdminDashboard {
         const csvContent = "data:text/csv;charset=utf-8," 
             + headers.join(',') + '\n' 
             + rows.map(e => e.join(',')).join('\n');
-
-        const encodedUri = encodeURI(csvContent);
+const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
         link.setAttribute("download", `student_data_${new Date().toISOString().split('T')[0]}.csv`);
@@ -495,3 +500,4 @@ export class AdminDashboard {
       }
     }
 }
+                                                      
