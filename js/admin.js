@@ -8,6 +8,8 @@ export class AdminDashboard {
     constructor(configManager) {
         this.registeredStudents = [];
         this.configManager = configManager;
+        // --- NEW: To store the current report data for export ---
+        this.currentReportData = null; 
     }
 
     async init() {
@@ -276,6 +278,7 @@ export class AdminDashboard {
         const reportType = document.getElementById('reportType').value;
         const reportDisplay = document.getElementById('reportDisplay');
         reportDisplay.innerHTML = `<p class="text-center p-3">Generating report, please wait...</p>`;
+        this.currentReportData = null; // Clear previous report data
 
         if (this.registeredStudents.length === 0) {
             await this.loadRegisteredStudents();
@@ -328,6 +331,13 @@ export class AdminDashboard {
             `<span class="status-badge status-${rec.status}">${rec.status}</span>`,
             rec.timestamp ? new Date(rec.timestamp.toDate()).toLocaleTimeString() : 'N/A'
         ]);
+        
+        // --- Store data for export ---
+        this.currentReportData = {
+            title: `Daily_Report_${dateStr}`,
+            headers: headers,
+            rows: records.map(rec => [rec.rollNumber, rec.username, rec.section, rec.subject, rec.status, rec.timestamp ? new Date(rec.timestamp.toDate()).toLocaleString() : 'N/A'])
+        };
 
         this.renderReport(`Daily Report for ${formattedDate}`, headers, rows);
     }
@@ -377,6 +387,17 @@ export class AdminDashboard {
             const badgeClass = percentage >= 75 ? 'status-present' : percentage >= 60 ? 'status-late' : 'status-absent';
             return [rollNumber, stats.username, stats.section, stats.present, stats.total, `<span class="status-badge ${badgeClass}">${percentage}%</span>`];
         }).filter(row => row !== null);
+
+        // --- Store data for export ---
+        this.currentReportData = {
+            title: `Weekly_Report_${year}_W${week}`,
+            headers: headers,
+            rows: Object.entries(studentStats).map(([rollNumber, stats]) => {
+                if (stats.total === 0) return null;
+                const percentage = Math.round((stats.present / stats.total) * 100);
+                return [rollNumber, stats.username, stats.section, stats.present, stats.total, `${percentage}%`];
+            }).filter(row => row !== null)
+        };
 
         this.renderReport(`Weekly Report for Week ${week}, ${year}`, headers, rows);
     }
@@ -430,6 +451,21 @@ export class AdminDashboard {
             .map(item => [item.rollNumber, item.stats.username, item.stats.section, `<span class="status-badge status-absent">${item.percentage}%</span>`]);
 
         const monthName = new Date(year, month - 1).toLocaleString('default', { month: 'long' });
+        
+        // --- Store data for export ---
+         this.currentReportData = {
+            title: `Defaulter_Report_${monthName}_${year}`,
+            headers: headers,
+            rows: Object.entries(studentStats)
+                .map(([rollNumber, stats]) => {
+                    if (stats.total === 0) return null;
+                    const percentage = Math.round((stats.present / stats.total) * 100);
+                    return { rollNumber, stats, percentage };
+                })
+                .filter(item => item && item.percentage < defaulterThreshold)
+                .map(item => [item.rollNumber, item.stats.username, item.stats.section, `${item.percentage}%`])
+        };
+        
         this.renderReport(`Monthly Defaulter List (< ${defaulterThreshold}%) for ${monthName} ${year}`, headers, rows);
     }
 
@@ -461,7 +497,36 @@ export class AdminDashboard {
         reportDisplay.innerHTML = tableHTML;
     }
 
-    exportStudentData() {
+    // --- NEW: Function to handle exporting the current report ---
+    exportCurrentReport() {
+        if (!this.currentReportData || !this.currentReportData.rows || this.currentReportData.rows.length === 0) {
+            Utils.showAlert('No report generated to export. Please generate a report first.', 'warning');
+            return;
+        }
+
+        const { title, headers, rows } = this.currentReportData;
+
+        // Sanitize data for CSV: ensure no commas in data and quote if necessary
+        const sanitizeRow = row => row.map(cell => {
+            const cellStr = String(cell).replace(/"/g, '""');
+            return `"${cellStr}"`;
+        });
+        
+        const csvContent = "data:text/csv;charset=utf-8," 
+            + headers.join(',') + '\n' 
+            + rows.map(sanitizeRow).map(e => e.join(',')).join('\n');
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `${title}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        Utils.showAlert('Report exported successfully!', 'success');
+    }
+
+     exportStudentData() {
         if (this.registeredStudents.length === 0) {
             Utils.showAlert('No student data to export.', 'warning');
             return;
@@ -513,4 +578,3 @@ export class AdminDashboard {
       }
     }
 }
-     
