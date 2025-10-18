@@ -8,7 +8,6 @@ class AttendanceSystem {
         this.configManager = new ConfigManager();
         this.authManager = new AuthManager(this.configManager);
         this.studentDashboard = new StudentDashboard(this.configManager);
-        // --- UPDATED: Pass configManager to AdminDashboard ---
         this.adminDashboard = new AdminDashboard(this.configManager);
     }
 
@@ -44,8 +43,10 @@ class AttendanceSystem {
     }
 
     updateTime() {
-        document.getElementById('currentTime').textContent = Utils.formatTime();
-        document.getElementById('currentDate').textContent = Utils.formatDate();
+        const timeEl = document.getElementById('currentTime');
+        const dateEl = document.getElementById('currentDate');
+        if(timeEl) timeEl.textContent = Utils.formatTime();
+        if(dateEl) dateEl.textContent = Utils.formatDate();
     }
 
     attachEventListeners() {
@@ -58,6 +59,7 @@ class AttendanceSystem {
             const user = await this.authManager.loginStudent(rollNumber, username, password, section);
             if (user) this.showUI(user);
         });
+
         document.getElementById('adminAuthForm').addEventListener('submit', (e) => {
             e.preventDefault();
             const username = document.getElementById('adminUsername').value;
@@ -65,63 +67,75 @@ class AttendanceSystem {
             const user = this.authManager.loginAdmin(username, password);
             if (user) this.showUI(user);
         });
+
         document.getElementById('themeToggle').addEventListener('click', () => Utils.toggleTheme());
         document.getElementById('adminThemeToggle').addEventListener('click', () => Utils.toggleTheme());
     }
 }
 
+// --- INITIALIZE THE APP ---
 window.app = new AttendanceSystem();
 
-// --- Global Functions for HTML ---
+// --- GLOBAL FUNCTIONS (The 'Switchboard') ---
+// These connect the HTML buttons to the code in your other JS files.
+
+// Auth Tabs
 window.switchTab = (tabId) => {
-    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-    document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('#authContainer .tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('#authContainer .tab').forEach(el => el.classList.remove('active'));
     document.getElementById(`${tabId}Tab`).classList.add('active');
-    document.querySelector(`[onclick="switchTab('${tabId}')"]`).classList.add('active');
+    document.querySelector(`button[onclick="switchTab('${tabId}')"]`).classList.add('active');
 };
 
+// Student Dashboard Tabs
 window.switchDashboardTab = (tabId) => {
-    document.querySelectorAll('.tab-panel').forEach(el => el.classList.remove('active'));
-    document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('#studentDashboard .tab-panel').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('#studentDashboard .nav-tab').forEach(el => el.classList.remove('active'));
     document.getElementById(`${tabId}Tab`).classList.add('active');
-    document.querySelector(`[onclick="switchDashboardTab('${tabId}')"]`).classList.add('active');
+    document.querySelector(`button[onclick="switchDashboardTab('${tabId}')"]`).classList.add('active');
     if (tabId === 'timetable') {
         window.app.studentDashboard.renderTimetable();
     }
 };
 
+// Admin Dashboard Tabs
 window.switchAdminTab = (tabId) => {
-    document.querySelectorAll('.tab-panel').forEach(el => el.classList.remove('active'));
-    document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('#adminDashboard .tab-panel').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('#adminDashboard .nav-tab').forEach(el => el.classList.remove('active'));
     document.getElementById(`admin${tabId.charAt(0).toUpperCase() + tabId.slice(1)}Tab`).classList.add('active');
-    document.querySelector(`[onclick="switchAdminTab('${tabId}')"]`).classList.add('active');
+    document.querySelector(`button[onclick="switchAdminTab('${tabId}')"]`).classList.add('active');
 };
 
+// Student Functions
 window.changeCalendarMonth = (direction) => window.app.studentDashboard.changeMonth(direction);
+window.showDayDetails = (dateStr) => window.app.studentDashboard.showAttendanceForDay(dateStr);
+window.switchSection = (sectionId) => window.app.studentDashboard.switchSection(sectionId);
 
-window.showDayDetails = (dateStr) => {
-    window.app.studentDashboard.showAttendanceForDay(dateStr);
+// --- RESTORED QR SCAN SIMULATION ---
+window.scanQR = () => {
+    Utils.showAlert("Simulating QR scan...", "info", 2000);
+    // This timeout simulates the time it takes for a camera to scan a code
+    setTimeout(() => {
+        // In a real app, the QR code would contain the class info.
+        // We'll pass a placeholder to the markAttendance function.
+        window.app.studentDashboard.markAttendance("CS501 - Theory of Computation"); 
+    }, 1500);
 };
 
+
+// Admin Functions
 window.adminLogout = () => {
     window.app.authManager.logout();
     window.app.showUI(null);
 };
-
-window.scanQR = () => {
-    Utils.showAlert("Simulating QR scan...", "info", 2000);
-    setTimeout(() => { window.app.studentDashboard.markAttendance(); }, 1500);
-};
-
-window.switchSection = (sectionId) => window.app.studentDashboard.switchSection(sectionId);
-window.markManualAttendance = () => window.app.adminDashboard.markManualAttendance();
-window.clearDeviceData = () => window.app.adminDashboard.clearAllDeviceData();
 window.refreshAdminData = () => window.app.adminDashboard.loadRegisteredStudents();
-window.generateClassReport = () => window.app.adminDashboard.generateClassReport();
-// --- NEW GLOBAL FUNCTION ---
+window.markManualAttendance = () => window.app.adminDashboard.markManualAttendance();
 window.cancelClass = () => window.app.adminDashboard.cancelClass();
+window.generateClassReport = () => window.app.adminDashboard.generateClassReport();
+window.bulkLogout = () => window.app.adminDashboard.bulkLogout();
+window.clearDeviceData = () => window.app.adminDashboard.clearAllDeviceData();
 
-
+// --- START THE APP ---
 document.addEventListener('DOMContentLoaded', () => {
     window.app.init();
 });
