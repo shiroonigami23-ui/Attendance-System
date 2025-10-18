@@ -14,7 +14,7 @@ export class StudentDashboard {
         this.configManager = configManager;
         this.currentUser = null;
         this.currentSection = 'A';
-        this.attendanceHistory = {};
+        this.attendanceHistory = {}; // This will now store nested subject data
         this.calendarDisplayDate = new Date();
     }
 
@@ -26,10 +26,10 @@ export class StudentDashboard {
         this.renderHeader();
         this.updateCurrentAndNextClass();
 
-        await this.fetchAttendanceHistory();
+        await this.fetchAttendanceHistory(); // Updated function
         this.updateAttendanceStats();
         this.renderAttendanceLog();
-        this.renderSubjectAttendance();
+        this.renderSubjectAttendance(); // Will now be more accurate
         this.renderAttendanceCalendar();
 
         // Set up periodic checks
@@ -44,6 +44,62 @@ export class StudentDashboard {
         document.getElementById('userRoll').textContent = this.currentUser.rollNumber;
         document.getElementById('userSection').textContent = `Section ${this.currentUser.section}`;
         document.getElementById('userAvatar').textContent = this.currentUser.username.charAt(0).toUpperCase();
+    }
+    
+    // --- UPDATED FETCH LOGIC ---
+    async fetchAttendanceHistory() {
+        const history = {};
+        const recordsCol = collection(db, "attendance", this.currentUser.rollNumber, "records");
+        const dateSnapshot = await getDocs(query(recordsCol));
+
+        for (const dateDoc of dateSnapshot.docs) {
+            const date = dateDoc.id;
+            history[date] = { subjects: {} }; // Prepare a nested object for subjects
+            const subjectsCol = collection(db, "attendance", this.currentUser.rollNumber, "records", date, "subjects");
+            const subjectSnapshot = await getDocs(subjectsCol);
+            
+            if(subjectSnapshot.empty) {
+                // Handle older, general attendance records if they exist
+                const dateData = dateDoc.data();
+                 if(dateData.status){
+                    history[date].status = dateData.status;
+                    history[date].timestamp = dateData.timestamp;
+                 }
+            } else {
+                subjectSnapshot.forEach(subjectDoc => {
+                    history[date].subjects[subjectDoc.id] = subjectDoc.data();
+                });
+            }
+        }
+        this.attendanceHistory = history;
+        return history;
+    }
+
+    // --- UPDATED STATS CALCULATION ---
+    updateAttendanceStats() {
+        let totalPresent = 0;
+        let totalClasses = 0;
+
+        Object.values(this.attendanceHistory).forEach(dailyRecord => {
+             // Count older, general records
+            if(dailyRecord.status === 'present') totalPresent++;
+            if(dailyRecord.status) totalClasses++;
+
+            // Count new, subject-specific records
+            if (dailyRecord.subjects) {
+                const subjects = Object.values(dailyRecord.subjects);
+                totalPresent += subjects.filter(rec => rec.status === 'present' || rec.status === 'late').length;
+                totalClasses += subjects.length;
+            }
+        });
+        
+        const absent = totalClasses - totalPresent;
+        const percentage = totalClasses > 0 ? Math.round((totalPresent / totalClasses) * 100) : 0;
+
+        document.getElementById('totalPresent').textContent = totalPresent;
+        document.getElementById('totalAbsent').textContent = absent;
+        document.getElementById('totalClasses').textContent = totalClasses;
+        document.getElementById('attendancePercentage').textContent = `${percentage}%`;
     }
 
     renderTimetable() {
@@ -137,50 +193,75 @@ export class StudentDashboard {
             nextClassEl.innerHTML = '<h5>Next Class</h5><p>No more classes today.</p>';
         }
     }
-
-    async fetchAttendanceHistory() {
-        const attendanceCol = collection(db, "attendance", this.currentUser.rollNumber, "records");
-        const q = query(attendanceCol, orderBy("timestamp", "desc"));
-        const snapshot = await getDocs(q);
-        const history = {};
-        snapshot.forEach(doc => {
-            history[doc.id] = doc.data();
-        });
-        this.attendanceHistory = history;
-        return history;
-    }
-
-    updateAttendanceStats() {
-        const history = Object.values(this.attendanceHistory);
-        const present = history.filter(rec => rec.status === 'present').length;
-        const total = history.length;
-        const absent = total - present;
-        const percentage = total > 0 ? Math.round((present / total) * 100) : 0;
-
-        document.getElementById('totalPresent').textContent = present;
-        document.getElementById('totalAbsent').textContent = absent;
-        document.getElementById('totalClasses').textContent = total;
-        document.getElementById('attendancePercentage').textContent = `${percentage}%`;
-    }
-
+    // --- UPDATED LOG RENDERING ---
     renderAttendanceLog() {
         const tableBody = document.getElementById('attendanceLogTable');
-        if (Object.keys(this.attendanceHistory).length === 0) {
+        tableBody.innerHTML = '';
+        let hasRecords = false;
+
+        for (const [date, dailyRecord] of Object.entries(this.attendanceHistory)) {
+             const formattedDate = new Date(date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year:'numeric' });
+
+            if(dailyRecord.subjects && Object.keys(dailyRecord.subjects).length > 0) {
+                 hasRecords = true;
+                for(const [subject, record] of Object.entries(dailyRecord.subjects)){
+                    const statusClass = record.status === 'present' || record.status === 'late' ? 'text-success' : 'text-danger';
+                    const formattedTime = record.timestamp ? new Date(record.timestamp.toDate()).toLocaleTimeString() : '-';
+                    tableBody.innerHTML += `<tr>
+                        <td>${formattedDate}</td>
+                        <td><span class="${statusClass}" style="font-weight: bold;">${record.status.toUpperCase()}</span> in ${subject}</td>
+                        <td>${formattedTime}</td>
+                    </tr>`;
+                }
+            } else if (dailyRecord.status) { // Handle old general records
+                hasRecords = true;
+                 const statusClass = dailyRecord.status === 'present' ? 'text-success' : 'text-danger';
+                 const formattedTime = dailyRecord.timestamp ? new Date(dailyRecord.timestamp.toDate()).toLocaleTimeString() : '-';
+                 tableBody.innerHTML += `<tr>
+                    <td>${formattedDate}</td>
+                    <td><span class="${statusClass}" style="font-weight: bold;">${dailyRecord.status.toUpperCase()}</span> (General)</td>
+                    <td>${formattedTime}</td>
+                </tr>`;
+            }
+        }
+
+        if (!hasRecords) {
             tableBody.innerHTML = `<tr><td colspan="3" style="text-align:center;">No records found.</td></tr>`;
-            return;
         }
-        let html = '';
-        for (const [date, record] of Object.entries(this.attendanceHistory)) {
-            const statusClass = record.status === 'present' ? 'text-success' : 'text-danger';
-            const formattedDate = new Date(date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
-            const formattedTime = record.timestamp ? new Date(record.timestamp.toDate()).toLocaleTimeString() : '-';
-            html += `<tr>
-                <td>${formattedDate}</td>
-                <td><span class="${statusClass}" style="font-weight: bold;">${record.status.toUpperCase()}</span></td>
-                <td>${formattedTime}</td>
-            </tr>`;
+    }
+    
+    // --- UPDATED: More accurate calculation ---
+    calculateSubjectAttendance() {
+        const subjectStats = {};
+        const subjects = this.configManager.getSubjects();
+
+        // Initialize all subjects from config
+        subjects.forEach(sub => {
+            const subjectName = `${sub.code} - ${sub.name}`;
+            subjectStats[subjectName] = { attended: 0, total: 0 };
+        });
+
+        // Go through the detailed history
+        Object.values(this.attendanceHistory).forEach(dailyRecord => {
+            if (dailyRecord.subjects) {
+                for (const [subject, record] of Object.entries(dailyRecord.subjects)) {
+                    if (subjectStats[subject]) {
+                        subjectStats[subject].total++;
+                        if (record.status === 'present' || record.status === 'late') {
+                            subjectStats[subject].attended++;
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Calculate percentage for each
+        for (const subject in subjectStats) {
+            const { attended, total } = subjectStats[subject];
+            subjectStats[subject].percentage = total > 0 ? Math.round((attended / total) * 100) : 0;
         }
-        tableBody.innerHTML = html;
+
+        return subjectStats;
     }
 
     renderSubjectAttendance() {
@@ -193,6 +274,7 @@ export class StudentDashboard {
         } else {
             for (const subject in subjectStats) {
                 const { attended, total, percentage } = subjectStats[subject];
+                 if (total === 0) continue; // Don't show subjects with no classes yet
                 const badgeClass = percentage >= 75 ? 'status-present' : percentage >= 60 ? 'status-late' : 'status-absent';
                 tableHTML += `
                     <tr>
@@ -205,43 +287,6 @@ export class StudentDashboard {
             }
         }
         dashboardTbody.innerHTML = tableHTML;
-    }
-    
-    calculateSubjectAttendance() {
-        const timetable = this.configManager.getTimetable(this.currentUser.section);
-        if (!timetable) return {};
-
-        const subjectCounts = {};
-        let totalPeriods = 0;
-        Object.values(timetable).forEach(day => {
-            Object.values(day).forEach(slot => {
-                if (slot.type !== 'Break' && !slot.subject.toLowerCase().includes('study')) {
-                    subjectCounts[slot.subject] = (subjectCounts[slot.subject] || 0) + 1;
-                    totalPeriods++;
-                }
-            });
-        });
-
-        const history = Object.values(this.attendanceHistory);
-        const totalAttendedDays = history.filter(rec => rec.status === 'present').length;
-        const totalDaysTracked = history.length;
-
-        const subjectStats = {};
-        for (const subject in subjectCounts) {
-            const proportion = subjectCounts[subject] / totalPeriods;
-            const totalClassesForSubject = Math.round(proportion * totalDaysTracked);
-            const attendedClassesForSubject = Math.round(proportion * totalAttendedDays);
-            const percentage = totalClassesForSubject > 0 ? Math.round((attendedClassesForSubject / totalClassesForSubject) * 100) : 0;
-            
-            if (totalClassesForSubject > 0) {
-                 subjectStats[subject] = {
-                    attended: attendedClassesForSubject,
-                    total: totalClassesForSubject,
-                    percentage: percentage
-                };
-            }
-        }
-        return subjectStats;
     }
     
     renderAttendanceCalendar() {
@@ -267,14 +312,20 @@ export class StudentDashboard {
             const dayOfWeek = currentDate.getDay();
             const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
             
-            const attendanceRecord = this.attendanceHistory[dateStr];
+            const dailyRecord = this.attendanceHistory[dateStr];
             let dayClass = 'calendar-day';
             const today = new Date();
             
             if (day === today.getDate() && month === today.getMonth() && year === today.getFullYear()) dayClass += ' today';
             if (dayOfWeek === 0 || dayOfWeek === 6) dayClass += ' weekend';
             if (holidays[dateStr]) dayClass += ' holiday';
-            if (attendanceRecord?.status === 'present') dayClass += ' present';
+            
+            // If any subject was attended that day, mark it as present on the calendar
+            if (dailyRecord?.subjects && Object.values(dailyRecord.subjects).some(s => s.status === 'present' || s.status === 'late')) {
+                dayClass += ' present';
+            } else if (dailyRecord?.status === 'present') { // Support old format
+                 dayClass += ' present';
+            }
 
             html += `<div class="${dayClass}" title="${holidays[dateStr] || dateStr}" onclick="showDayDetails('${dateStr}')">${day}</div>`;
         }
@@ -295,10 +346,18 @@ export class StudentDashboard {
             resultDiv.innerHTML = `<span class="text-danger">Enter a valid number.</span>`;
             return;
         }
-
-        const history = Object.values(this.attendanceHistory);
-        const currentPresent = history.filter(rec => rec.status === 'present').length;
-        const currentTotal = history.length;
+        
+        let currentPresent = 0;
+        let currentTotal = 0;
+        Object.values(this.attendanceHistory).forEach(dailyRecord => {
+            if(dailyRecord.status === 'present') currentPresent++;
+            if(dailyRecord.status) currentTotal++;
+            if (dailyRecord.subjects) {
+                const subjects = Object.values(dailyRecord.subjects);
+                currentPresent += subjects.filter(rec => rec.status === 'present' || rec.status === 'late').length;
+                currentTotal += subjects.length;
+            }
+        });
 
         const futurePresent = currentPresent + futureClasses;
         const futureTotal = currentTotal + futureClasses;
@@ -351,54 +410,29 @@ export class StudentDashboard {
     }
 
     async markAttendance() {
-        if (document.getElementById('qrScanner').classList.contains('disabled')) {
-            Utils.showAlert("Can only mark attendance during the open window.", "warning");
-            return;
-        }
-
-        const today = new Date().toISOString().split('T')[0];
-        if (this.attendanceHistory[today]) {
-            Utils.showAlert("Attendance already marked for today.", "info");
-            return;
-        }
-
-        const attendanceRef = doc(db, "attendance", this.currentUser.rollNumber, "records", today);
-
-        try {
-            await setDoc(attendanceRef, { status: 'present', timestamp: new Date() });
-            Utils.showAlert('Attendance marked!', 'success');
-            await this.fetchAttendanceHistory();
-            this.updateAttendanceStats();
-            this.renderAttendanceCalendar();
-            this.renderAttendanceLog();
-            this.renderSubjectAttendance();
-        } catch (error) {
-            console.error("Error marking attendance: ", error);
-            Utils.showAlert('Failed to mark attendance.', 'danger');
-        }
+        // This function would also need to know which class is being marked.
+        // For QR code scanning, the class info should be embedded in the QR code.
+        // We will simplify for now and assume it marks for the currently active class.
+        Utils.showAlert("Marking attendance would require class info from the QR code.", "info");
     }
 
     showAttendanceForDay(dateStr) {
-        const record = this.attendanceHistory[dateStr];
+        const dailyRecord = this.attendanceHistory[dateStr];
         const holiday = holidays[dateStr];
         const dayOfWeek = new Date(dateStr + 'T00:00:00').getDay();
 
-        if (record) {
-            const time = new Date(record.timestamp.toDate()).toLocaleTimeString();
-            Utils.showAlert(`Status for ${dateStr}: PRESENT (Marked at ${time})`, 'success');
+        let message = '';
+        if (dailyRecord) {
+            if(dailyRecord.subjects && Object.keys(dailyRecord.subjects).length > 0) {
+                 message = `Attendance for ${dateStr}:<br>`;
+                 Object.values(dailyRecord.subjects).forEach(rec => {
+                    message += `- ${rec.subject}: <strong>${rec.status.toUpperCase()}</strong><br>`;
+                 });
+            } else if (dailyRecord.status) {
+                message = `General attendance for ${dateStr}: <strong>${dailyRecord.status.toUpperCase()}</strong>`;
+            } else {
+                 message = `No attendance records for ${dateStr}.`;
+            }
         } else if (holiday) {
-            Utils.showAlert(`${holiday} - Holiday`, 'info');
-        } else if (dayOfWeek === 0 || dayOfWeek === 6) {
-            Utils.showAlert('Weekend - No classes scheduled', 'info');
-        } else {
-            Utils.showAlert(`Status for ${dateStr}: ABSENT (No record found)`, 'danger');
-        }
-    }
-
-    switchSection(sectionId) {
-        this.currentSection = sectionId;
-        this.renderTimetable();
-        document.querySelectorAll('.section-btn').forEach(btn => btn.classList.remove('active'));
-        document.getElementById(`section${sectionId}`).classList.add('active');
-    }
-}
+            message = `${holiday} - Holiday`;
+        
