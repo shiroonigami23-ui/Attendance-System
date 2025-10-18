@@ -50,6 +50,10 @@
                     <div class="header-controls"><div class="text-center"><div id="currentTime" style="font-size: 1.2rem; font-weight: 600;"></div><div id="currentDate" style="font-size: 0.9rem; color: var(--muted);"></div></div><button id="themeToggle" class="theme-toggle"><i class="fas fa-moon"></i> <span>Dark Mode</span></button></div>
                 </div>
             </header>
+            
+            <!-- --- NEW: Banner for Holidays and Weekends --- -->
+            <div id="dayStatusMessage" class="alert alert-success hidden" style="text-align: center; font-weight: bold; margin-bottom: 20px;"><i class="alert-icon fas fa-bullhorn"></i><span></span></div>
+            
             <div id="attendanceWindowBar" class="alert alert-info hidden" style="text-align: center; font-weight: bold;"><i class="alert-icon fas fa-clock"></i><span id="attendanceWindowMessage"></span></div>
             <div class="row">
                 <div class="col-md-3"><div class="stats-card"><div class="icon" style="color: var(--success);"><i class="fas fa-check-circle"></i></div><div id="totalPresent" class="number">0</div><div class="label">Total Present</div></div></div>
@@ -137,7 +141,6 @@
                             </div>
                         </div>
                     </div>
-                    <!-- --- NEW: Added Export Button --- -->
                     <div class="d-flex gap-3">
                         <button class="btn btn-info" onclick="generateClassReport()"><i class="fas fa-chart-bar"></i> Generate Report</button>
                         <button class="btn btn-secondary" onclick="exportReport()"><i class="fas fa-file-excel"></i> Export Report to CSV</button>
