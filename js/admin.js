@@ -1,7 +1,7 @@
 // js/admin.js
 
 import { db } from './firebase-config.js';
-import { collection, getDocs, doc, setDoc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+import { collection, getDocs, doc, setDoc, getDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 import { Utils } from './utils.js';
 
 export class AdminDashboard {
@@ -177,7 +177,6 @@ export class AdminDashboard {
         }
     }
 
-    // --- UPDATED to prevent duplicates and allow updates ---
     async markManualAttendance() {
         const rollNumber = document.getElementById('manualRollNumber').value;
         const newStatus = document.getElementById('attendanceStatus').value;
@@ -190,7 +189,6 @@ export class AdminDashboard {
             return;
         }
 
-        // --- Timetable Validation (as before) ---
         const selectedDate = new Date(dateStr + 'T00:00:00');
         const student = this.registeredStudents.find(s => s.rollNumber === rollNumber);
         if (!student) {
@@ -211,21 +209,18 @@ export class AdminDashboard {
             return;
         }
 
-        // --- NEW LOGIC: Check for existing record ---
         const attendanceRef = doc(db, "attendance", rollNumber, "records", dateStr, "subjects", className);
         
         try {
             const docSnap = await getDoc(attendanceRef);
 
             if (docSnap.exists()) {
-                // RECORD EXISTS
                 const existingStatus = docSnap.data().status;
                 if (existingStatus === newStatus) {
                     Utils.showAlert(`Student is already marked as '${existingStatus}'. No change needed.`, 'info');
                     return;
                 }
                 
-                // Ask for confirmation to UPDATE
                 if (confirm(`A record already exists with status '${existingStatus}'. Do you want to change it to '${newStatus}'?`)) {
                     await updateDoc(attendanceRef, {
                         status: newStatus,
@@ -235,7 +230,6 @@ export class AdminDashboard {
                     Utils.showAlert('Attendance record updated successfully!', 'success');
                 }
             } else {
-                // NO RECORD EXISTS - CREATE NEW ONE
                 await setDoc(attendanceRef, {
                     status: newStatus,
                     subject: className,
@@ -452,7 +446,6 @@ export class AdminDashboard {
         }
 
         let tableHTML = `
-        let tableHTML = `
             <h4 class="card-title mt-4">${title}</h4>
             <div class="table-responsive">
                 <table class="table">
@@ -464,10 +457,11 @@ export class AdminDashboard {
                     </tbody>
                 </table>
             </div>
+        `;
         reportDisplay.innerHTML = tableHTML;
     }
 
-     exportStudentData() {
+    exportStudentData() {
         if (this.registeredStudents.length === 0) {
             Utils.showAlert('No student data to export.', 'warning');
             return;
@@ -499,7 +493,7 @@ export class AdminDashboard {
         link.click();
         document.body.removeChild(link);
         Utils.showAlert('Student data exported!', 'success');
-}
+    }
 
 
     async bulkLogout() {
@@ -518,4 +512,5 @@ export class AdminDashboard {
         await this.bulkLogout();
       }
     }
-        }
+}
+     
