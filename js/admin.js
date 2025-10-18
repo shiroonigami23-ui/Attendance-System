@@ -151,8 +151,9 @@ export class AdminDashboard {
             const deviceIdText = student.deviceId ? `${student.deviceId.substring(0, 15)}...` : 'Not Registered';
             const actionButton = student.deviceId ? `<button class="btn btn-sm btn-danger" onclick="window.app.adminDashboard.forceLogoutStudent('${student.deviceId}')"><i class="fas fa-sign-out-alt"></i></button>` : '';
 
+            // --- UPDATED: Made roll number a clickable link ---
             row.innerHTML = `
-                <td>${student.rollNumber || 'N/A'}</td>
+                <td><a href="#" class="roll-number-link" onclick="viewStudentDetails('${student.rollNumber}')">${student.rollNumber || 'N/A'}</a></td>
                 <td>${student.username || 'N/A'}</td>
                 <td>${student.section || 'N/A'}</td>
                 <td>${deviceIdText}</td>
@@ -162,6 +163,59 @@ export class AdminDashboard {
             `;
             tbody.appendChild(row);
         });
+    }
+
+    // --- NEW: Function to show the student details modal ---
+    async showStudentAttendanceModal(rollNumber) {
+        const modal = document.getElementById('studentDetailModal');
+        const modalContent = document.getElementById('modalContent');
+        const student = this.registeredStudents.find(s => s.rollNumber === rollNumber);
+
+        if (!student) {
+            Utils.showAlert('Could not find student details.', 'danger');
+            return;
+        }
+
+        modal.classList.remove('hidden');
+        modalContent.innerHTML = `
+            <div id="modalLoader">
+                <i class="fas fa-spinner"></i>
+                <p>Calculating Attendance...</p>
+            </div>`;
+
+        // Fetch all attendance for this student
+        const recordsCol = collection(db, "attendance", rollNumber, "records");
+        const dateSnapshot = await getDocs(recordsCol);
+
+        let totalPresent = 0;
+        let totalClasses = 0;
+
+        for (const dateDoc of dateSnapshot.docs) {
+            const subjectsCol = collection(db, "attendance", rollNumber, "records", dateDoc.id, "subjects");
+            const subjectSnapshot = await getDocs(subjectsCol);
+            
+            subjectSnapshot.forEach(subjectDoc => {
+                const record = subjectDoc.data();
+                if (record.status !== 'cancelled') {
+                    totalClasses++;
+                    if (record.status === 'present' || record.status === 'late') {
+                        totalPresent++;
+                    }
+                }
+            });
+        }
+
+        const percentage = totalClasses > 0 ? Math.round((totalPresent / totalClasses) * 100) : 0;
+        const badgeClass = percentage >= 75 ? 'status-present' : percentage >= 60 ? 'status-late' : 'status-absent';
+
+        modalContent.innerHTML = `
+            <h3>${student.username}</h3>
+            <p>${student.rollNumber} | Section ${student.section}</p>
+            <div id="modalPercentage" class="${badgeClass}">${percentage}%</div>
+            <div class="text-center">
+                <p><strong>${totalPresent}</strong> classes attended out of <strong>${totalClasses}</strong> total classes.</p>
+            </div>
+        `;
     }
     
     updateAdminStats() {
@@ -246,7 +300,6 @@ export class AdminDashboard {
         }
     }
     
-    // --- UPDATED to post a public cancellation notice ---
     async cancelClass() {
         const cancelDate = document.getElementById('cancelDate').value; 
         const className = document.getElementById('cancelClassSelector').value;
@@ -260,7 +313,6 @@ export class AdminDashboard {
 
         Utils.showAlert('Processing cancellation for all registered students...', 'info');
         
-        // Step 1: Mark attendance as 'cancelled' for every student
         const cancellationPromises = this.registeredStudents.map(student => {
             const attendanceRef = doc(db, "attendance", student.rollNumber, "records", cancelDate, "subjects", className);
             return setDoc(attendanceRef, {
@@ -272,16 +324,15 @@ export class AdminDashboard {
         });
         await Promise.all(cancellationPromises);
 
-        // Step 2: Post a single public notice for the student apps to find
         try {
             const noticeRef = doc(db, "cancellations", cancelDate);
             await setDoc(noticeRef, {
                 cancelledClasses: arrayUnion({
                     className: className,
                     timestamp: new Date(),
-                    sections: ['A', 'B'] // Assuming it's for all sections
+                    sections: ['A', 'B']
                 })
-            }, { merge: true }); // Merge to avoid overwriting other cancellations on the same day
+            }, { merge: true });
 
             Utils.showAlert(`Successfully cancelled "${className}" and sent notifications.`, 'success');
         } catch (error) {
