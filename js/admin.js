@@ -464,7 +464,6 @@ export class AdminDashboard {
                     </tbody>
                 </table>
             </div>
-        `;
         reportDisplay.innerHTML = tableHTML;
     }
 
