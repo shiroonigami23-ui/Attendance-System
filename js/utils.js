@@ -52,6 +52,11 @@ export class ConfigManager {
             username: admin?.querySelector('username')?.textContent || 'admin',
             password: admin?.querySelector('password')?.textContent || 'admin123',
         };
+        // --- NEW: Parse Subjects ---
+        config.subjects = Array.from(xmlDoc.querySelectorAll('subjects subject')).map(subject => ({
+            code: subject.getAttribute('code'),
+            name: subject.getAttribute('name'),
+        }));
         // Timetable
         config.timetable = {};
         xmlDoc.querySelectorAll('timetable section').forEach(section => {
@@ -76,6 +81,8 @@ export class ConfigManager {
     getRollNumberRanges() { return this.config?.rollNumbers || []; }
     getAdminCredentials() { return this.config?.admin || {}; }
     getTimetable(section) { return this.config?.timetable?.[section] || {}; }
+    // --- NEW: Getter for Subjects ---
+    getSubjects() { return this.config?.subjects || []; }
 }
 
 export const Utils = {
