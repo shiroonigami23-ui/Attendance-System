@@ -1,7 +1,6 @@
 import { db } from './firebase-config.js';
 import { doc, setDoc, collection, getDocs, orderBy, query } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 import { Utils } from './utils.js';
-// --- UPDATED: Import the new holidays list ---
 import { holidays } from './holidays.js';
 
 
@@ -10,7 +9,7 @@ export class StudentDashboard {
         this.configManager = configManager;
         this.currentUser = null;
         this.currentSection = 'A';
-        this.attendanceHistory = {}; // This will now store nested subject data
+        this.attendanceHistory = {};
         this.calendarDisplayDate = new Date();
     }
 
@@ -20,17 +19,15 @@ export class StudentDashboard {
         this.calendarDisplayDate = new Date();
 
         this.renderHeader();
-        this.updateCurrentAndNextClass();
+        this.displayDayStatusMessage(); // Check for weekends/holidays
 
-        await this.fetchAttendanceHistory(); // Updated function
+        await this.fetchAttendanceHistory();
         this.updateAttendanceStats();
         this.renderAttendanceLog();
-        this.renderSubjectAttendance(); // Will now be more accurate
+        this.renderSubjectAttendance();
         this.renderAttendanceCalendar();
 
-        // Set up periodic checks
         setInterval(() => this.checkAttendanceWindow(), 30000);
-        setInterval(() => this.updateCurrentAndNextClass(), 60000);
         this.checkAttendanceWindow();
     }
 
@@ -42,6 +39,29 @@ export class StudentDashboard {
         document.getElementById('userAvatar').textContent = this.currentUser.username.charAt(0).toUpperCase();
     }
     
+    // --- NEW: Displays a banner for holidays or weekends ---
+    displayDayStatusMessage() {
+        const messageContainer = document.getElementById('dayStatusMessage');
+        const messageSpan = messageContainer.querySelector('span');
+        const now = new Date();
+        const dayOfWeek = now.getDay(); // Sunday = 0, Saturday = 6
+        const dateStr = now.toISOString().split('T')[0];
+
+        const holiday = holidays[dateStr];
+
+        if (holiday) {
+            messageSpan.textContent = `Today is ${holiday}. Enjoy the day off!`;
+            messageContainer.classList.remove('hidden');
+            messageContainer.className = 'alert alert-info'; // Blue style for holidays
+        } else if (dayOfWeek === 0 || dayOfWeek === 6) { // 0 for Sunday, 6 for Saturday
+            messageSpan.textContent = `It's the weekend! No classes are scheduled today.`;
+            messageContainer.classList.remove('hidden');
+            messageContainer.className = 'alert alert-success'; // Green style for weekends
+        } else {
+            messageContainer.classList.add('hidden');
+        }
+    }
+
     async fetchAttendanceHistory() {
         const history = {};
         const recordsCol = collection(db, "attendance", this.currentUser.rollNumber, "records");
@@ -49,12 +69,11 @@ export class StudentDashboard {
 
         for (const dateDoc of dateSnapshot.docs) {
             const date = dateDoc.id;
-            history[date] = { subjects: {} }; // Prepare a nested object for subjects
+            history[date] = { subjects: {} };
             const subjectsCol = collection(db, "attendance", this.currentUser.rollNumber, "records", date, "subjects");
             const subjectSnapshot = await getDocs(subjectsCol);
             
             if(subjectSnapshot.empty) {
-                // Handle older, general attendance records if they exist
                 const dateData = dateDoc.data();
                  if(dateData.status){
                     history[date].status = dateData.status;
@@ -70,20 +89,17 @@ export class StudentDashboard {
         return history;
     }
 
-    // --- UPDATED STATS CALCULATION ---
     updateAttendanceStats() {
         let totalPresent = 0;
         let totalClasses = 0;
 
         Object.values(this.attendanceHistory).forEach(dailyRecord => {
             if(dailyRecord.status === 'present') totalPresent++;
-            // Exclude cancelled from total
             if(dailyRecord.status && dailyRecord.status !== 'cancelled') totalClasses++;
 
             if (dailyRecord.subjects) {
                 const subjects = Object.values(dailyRecord.subjects);
                 totalPresent += subjects.filter(rec => rec.status === 'present' || rec.status === 'late').length;
-                // Exclude cancelled classes from the total count
                 totalClasses += subjects.filter(rec => rec.status !== 'cancelled').length;
             }
         });
@@ -95,6 +111,13 @@ export class StudentDashboard {
         document.getElementById('totalAbsent').textContent = absent;
         document.getElementById('totalClasses').textContent = totalClasses;
         document.getElementById('attendancePercentage').textContent = `${percentage}%`;
+    }
+    
+    switchSection(sectionId) {
+        this.currentSection = sectionId;
+        document.querySelectorAll('.section-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(`section${sectionId}`).classList.add('active');
+        this.renderTimetable();
     }
 
     renderTimetable() {
@@ -112,7 +135,11 @@ export class StudentDashboard {
                 Object.keys(sectionData[day]).forEach(time => uniqueTimes.add(time));
             }
         });
-        const timeSlots = Array.from(uniqueTimes).sort((a, b) => a.split(':')[0] - b.split(':')[0] || a.split(':')[1].split('-')[0] - b.split(':')[1].split('-')[0]);
+        const timeSlots = Array.from(uniqueTimes).sort((a, b) => {
+            const timeA = parseInt(a.split(':')[0], 10) * 60 + parseInt(a.split(':')[1].split('-')[0], 10);
+            const timeB = parseInt(b.split(':')[0], 10) * 60 + parseInt(b.split(':')[1].split('-')[0], 10);
+            return timeA - timeB;
+        });
 
         let tableHTML = `<table class="timetable"><thead><tr><th>Time</th>${days.map(d => `<th>${d}</th>`).join('')}</tr></thead><tbody>`;
         timeSlots.forEach(time => {
@@ -131,86 +158,26 @@ export class StudentDashboard {
         timetableContent.innerHTML = tableHTML;
     }
 
-    updateCurrentAndNextClass() {
-        const currentClassEl = document.getElementById('currentClass');
-        const nextClassEl = document.getElementById('nextClass');
-        if (!currentClassEl || !nextClassEl) return;
 
-        const now = new Date();
-        const currentDay = now.toLocaleString('en-US', { weekday: 'long' });
-        const timetable = this.configManager.getTimetable(this.currentUser.section);
-        const daySchedule = timetable?.[currentDay];
-
-        if (!daySchedule) {
-            currentClassEl.innerHTML = '<h5>Current Class</h5><p>No classes scheduled today.</p>';
-            nextClassEl.innerHTML = '<h5>Next Class</h5><p>Enjoy your day off!</p>';
-            return;
-        }
-
-        let currentClass = null;
-        let nextClass = null;
-        const sortedSlots = Object.keys(daySchedule).sort();
-
-        for (let i = 0; i < sortedSlots.length; i++) {
-            const timeSlot = sortedSlots[i];
-            const [startTimeStr, endTimeStr] = timeSlot.split('-');
-            const [startHour, startMinute] = startTimeStr.split(':').map(Number);
-            const [endHour, endMinute] = endTimeStr.split(':').map(Number);
-
-            const classStart = new Date();
-            classStart.setHours(startHour, startMinute, 0, 0);
-            const classEnd = new Date();
-            classEnd.setHours(endHour, endMinute, 0, 0);
-
-            if (now >= classStart && now <= classEnd) {
-                currentClass = { ...daySchedule[timeSlot], timeSlot };
-                if (i + 1 < sortedSlots.length) {
-                    const nextTimeSlot = sortedSlots[i+1];
-                    nextClass = { ...daySchedule[nextTimeSlot], timeSlot: nextTimeSlot };
-                }
-                break;
-            } else if (now < classStart) {
-                if (!nextClass) {
-                   nextClass = { ...daySchedule[timeSlot], timeSlot };
-                }
-            }
-        }
-        
-        if (currentClass) {
-            currentClassEl.innerHTML = `<h5>Current Class</h5><strong>${currentClass.subject}</strong><p><i class="fas fa-clock"></i> ${currentClass.timeSlot} | <i class="fas fa-map-marker-alt"></i> ${currentClass.room}</p>`;
-        } else {
-            currentClassEl.innerHTML = '<h5>Current Class</h5><p>No class right now.</p>';
-        }
-
-        if (nextClass) {
-            nextClassEl.innerHTML = `<h5>Next Class</h5><strong>${nextClass.subject}</strong><p><i class="fas fa-clock"></i> ${nextClass.timeSlot} | <i class="fas fa-map-marker-alt"></i> ${nextClass.room}</p>`;
-        } else {
-            nextClassEl.innerHTML = '<h5>Next Class</h5><p>No more classes today.</p>';
-        }
-    }
-
-    // --- UPDATED LOG RENDERING ---
     renderAttendanceLog() {
         const tableBody = document.getElementById('attendanceLogTable');
         tableBody.innerHTML = '';
         let hasRecords = false;
 
-        for (const [date, dailyRecord] of Object.entries(this.attendanceHistory)) {
-             const formattedDate = new Date(date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year:'numeric' });
+        const sortedDates = Object.keys(this.attendanceHistory).sort((a, b) => new Date(b) - new Date(a));
+
+        for (const date of sortedDates) {
+            const dailyRecord = this.attendanceHistory[date];
+            const formattedDate = new Date(date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year:'numeric' });
 
             if(dailyRecord.subjects && Object.keys(dailyRecord.subjects).length > 0) {
-                 hasRecords = true;
+                hasRecords = true;
                 for(const [subject, record] of Object.entries(dailyRecord.subjects)){
-                    let statusClass = '';
+                    let statusClass = 'text-muted';
                     let statusText = record.status.toUpperCase();
 
-                    if (record.status === 'present' || record.status === 'late') {
-                        statusClass = 'text-success';
-                    } else if (record.status === 'absent') {
-                        statusClass = 'text-danger';
-                    } else { // Cancelled or other statuses
-                        statusClass = 'text-muted';
-                    }
+                    if (record.status === 'present' || record.status === 'late') statusClass = 'text-success';
+                    if (record.status === 'absent') statusClass = 'text-danger';
 
                     const formattedTime = record.timestamp ? new Date(record.timestamp.toDate()).toLocaleTimeString() : '-';
                     tableBody.innerHTML += `<tr>
@@ -219,13 +186,11 @@ export class StudentDashboard {
                         <td>${formattedTime}</td>
                     </tr>`;
                 }
-            } else if (dailyRecord.status) {
-                // ... logic for old general records
             }
         }
 
         if (!hasRecords) {
-            tableBody.innerHTML = `<tr><td colspan="3" style="text-align:center;">No records found.</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="3" style="text-align:center;">No attendance records found.</td></tr>`;
         }
     }
     
@@ -233,17 +198,14 @@ export class StudentDashboard {
         const subjectStats = {};
         const subjects = this.configManager.getSubjects();
 
-        // Initialize all subjects from config
         subjects.forEach(sub => {
             const subjectName = `${sub.code} - ${sub.name}`;
             subjectStats[subjectName] = { attended: 0, total: 0 };
         });
 
-        // Go through the detailed history
         Object.values(this.attendanceHistory).forEach(dailyRecord => {
             if (dailyRecord.subjects) {
                 for (const [subject, record] of Object.entries(dailyRecord.subjects)) {
-                    // Make sure not to count cancelled classes in the total
                     if (subjectStats[subject] && record.status !== 'cancelled') {
                         subjectStats[subject].total++;
                         if (record.status === 'present' || record.status === 'late') {
@@ -254,7 +216,6 @@ export class StudentDashboard {
             }
         });
         
-        // Calculate percentage for each
         for (const subject in subjectStats) {
             const { attended, total } = subjectStats[subject];
             subjectStats[subject].percentage = total > 0 ? Math.round((attended / total) * 100) : 0;
@@ -273,7 +234,7 @@ export class StudentDashboard {
         } else {
             for (const subject in subjectStats) {
                 const { attended, total, percentage } = subjectStats[subject];
-                 if (total === 0) continue; // Don't show subjects with no classes yet
+                 if (total === 0) continue;
                 const badgeClass = percentage >= 75 ? 'status-present' : percentage >= 60 ? 'status-late' : 'status-absent';
                 tableHTML += `
                     <tr>
@@ -300,10 +261,10 @@ export class StudentDashboard {
         title.textContent = date.toLocaleString('default', { month: 'long', year: 'numeric' });
 
         const daysInMonth = new Date(year, month + 1, 0).getDate();
-        const firstDayOfMonth = new Date(year, month, 1).getDay();
+        const firstDayOfMonth = (new Date(year, month, 1).getDay() + 6) % 7; 
         
         let html = '';
-        ['S', 'M', 'T', 'W', 'T', 'F', 'S'].forEach(day => html += `<div class="calendar-day-header">${day}</div>`);
+        ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].forEach(day => html += `<div class="calendar-day-header">${day}</div>`);
         for (let i = 0; i < firstDayOfMonth; i++) html += `<div></div>`;
 
         for (let day = 1; day <= daysInMonth; day++) {
@@ -319,14 +280,13 @@ export class StudentDashboard {
             if (dayOfWeek === 0 || dayOfWeek === 6) dayClass += ' weekend';
             if (holidays[dateStr]) dayClass += ' holiday';
             
-            // If any subject was attended that day, mark it as present on the calendar
             if (dailyRecord?.subjects && Object.values(dailyRecord.subjects).some(s => s.status === 'present' || s.status === 'late')) {
                 dayClass += ' present';
-            } else if (dailyRecord?.status === 'present') { // Support old format
+            } else if (dailyRecord?.status === 'present') {
                  dayClass += ' present';
             }
 
-            html += `<div class="${dayClass}" title="${holidays[dateStr] || dateStr}" onclick="showDayDetails('${dateStr}')">${day}</div>`;
+            html += `<div class="${dayClass}" title="${holidays[dateStr] || dateStr}" onclick="window.app.studentDashboard.showAttendanceForDay('${dateStr}')">${day}</div>`;
         }
         calendar.innerHTML = html;
     }
@@ -354,7 +314,7 @@ export class StudentDashboard {
             if (dailyRecord.subjects) {
                 const subjects = Object.values(dailyRecord.subjects);
                 currentPresent += subjects.filter(rec => rec.status === 'present' || rec.status === 'late').length;
-                currentTotal += subjects.length;
+                currentTotal += subjects.filter(rec => rec.status !== 'cancelled').length;
             }
         });
 
@@ -409,35 +369,38 @@ export class StudentDashboard {
     }
 
     async markAttendance() {
-        // This function would also need to know which class is being marked.
-        // For QR code scanning, the class info should be embedded in the QR code.
-        // We will simplify for now and assume it marks for the currently active class.
         Utils.showAlert("Marking attendance would require class info from the QR code.", "info");
     }
 
     showAttendanceForDay(dateStr) {
         const dailyRecord = this.attendanceHistory[dateStr];
         const holiday = holidays[dateStr];
-        let message = ``;
-        const formattedDate = new Date(dateStr + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+        const dayOfWeek = new Date(dateStr + 'T00:00:00').getDay();
 
-        if (dailyRecord && dailyRecord.subjects && Object.keys(dailyRecord.subjects).length > 0) {
-            message = `Attendance for ${formattedDate}:<br>`;
-            Object.values(dailyRecord.subjects).forEach(rec => {
-                let statusText = `<strong>${rec.status.toUpperCase()}</strong>`;
-                if (rec.status === 'cancelled') {
-                    statusText = `<em>${rec.status.toUpperCase()}</em>`;
-                }
-                message += `- ${rec.subject}: ${statusText}<br>`;
-            });
-        } else if (dailyRecord && dailyRecord.status) {
-            message = `General attendance for ${formattedDate}: <strong>${dailyRecord.status.toUpperCase()}</strong>`;
+        let message = '';
+        if (dailyRecord) {
+            if(dailyRecord.subjects && Object.keys(dailyRecord.subjects).length > 0) {
+                 message = `Attendance for ${dateStr}:<br>`;
+                 Object.values(dailyRecord.subjects).forEach(rec => {
+                    let statusText = `<strong>${rec.status.toUpperCase()}</strong>`;
+                    if (rec.status === 'cancelled') {
+                        statusText = `<em>${rec.status.toUpperCase()}</em>`;
+                    }
+                    message += `- ${rec.subject}: ${statusText}<br>`;
+                 });
+            } else if (dailyRecord.status) {
+                message = `General attendance for ${dateStr}: <strong>${dailyRecord.status.toUpperCase()}</strong>`;
+            } else {
+                 message = `No attendance records for ${dateStr}.`;
+            }
         } else if (holiday) {
-            message = `<strong>Holiday on ${formattedDate}:</strong> ${holiday}`;
+            message = `This day was a holiday: <strong>${holiday}</strong>.`;
+        } else if (dayOfWeek === 0 || dayOfWeek === 6) {
+            message = `This was a weekend. No classes were scheduled.`;
         } else {
-            message = `No attendance records for ${formattedDate}.`;
+            message = `No attendance records found for ${dateStr}.`;
         }
         
-        Utils.showAlert(message, 'info', 10000);
+        Utils.showAlert(message, 'info', 8000);
     }
 }
