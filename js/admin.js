@@ -10,7 +10,25 @@ export class AdminDashboard {
         this.registeredStudents = [];
         this.configManager = configManager;
         this.currentReportData = null; 
+        // --- NEW: Set the date from which synchronization will write to the DB ---
+        this.syncStartDate = this.getNextMonday();
     }
+
+    /**
+     * Calculates the date of the next Monday.
+     * @returns {Date} - The date object for the upcoming Monday.
+     */
+    getNextMonday() {
+        const date = new Date();
+        const today = date.getDay(); // Sunday is 0, Monday is 1
+        const offset = today === 0 ? 1 : (8 - today) % 7;
+        const nextMonday = new Date(date);
+        nextMonday.setDate(date.getDate() + offset);
+        nextMonday.setHours(0, 0, 0, 0); // Set to the beginning of the day
+        console.log(`Synchronization will start writing to DB from: ${nextMonday.toDateString()}`);
+        return nextMonday;
+    }
+
 
     async init() {
         this.populateClassSelectors();
@@ -151,7 +169,6 @@ export class AdminDashboard {
             const deviceIdText = student.deviceId ? `${student.deviceId.substring(0, 15)}...` : 'Not Registered';
             const actionButton = student.deviceId ? `<button class="btn btn-sm btn-danger" onclick="window.app.adminDashboard.forceLogoutStudent('${student.deviceId}')"><i class="fas fa-sign-out-alt"></i></button>` : '';
 
-            // --- UPDATED: Made roll number a clickable link ---
             row.innerHTML = `
                 <td><a href="#" class="roll-number-link" onclick="viewStudentDetails('${student.rollNumber}')">${student.rollNumber || 'N/A'}</a></td>
                 <td>${student.username || 'N/A'}</td>
@@ -165,57 +182,88 @@ export class AdminDashboard {
         });
     }
 
-    // --- NEW: Function to show the student details modal ---
     async showStudentAttendanceModal(rollNumber) {
         const modal = document.getElementById('studentDetailModal');
         const modalContent = document.getElementById('modalContent');
         const student = this.registeredStudents.find(s => s.rollNumber === rollNumber);
-
+    
         if (!student) {
             Utils.showAlert('Could not find student details.', 'danger');
             return;
         }
-
+    
         modal.classList.remove('hidden');
-        modalContent.innerHTML = `
-            <div id="modalLoader">
-                <i class="fas fa-spinner"></i>
-                <p>Calculating Attendance...</p>
-            </div>`;
-
-        // Fetch all attendance for this student
-        const recordsCol = collection(db, "attendance", rollNumber, "records");
-        const dateSnapshot = await getDocs(recordsCol);
-
-        let totalPresent = 0;
-        let totalClasses = 0;
-
-        for (const dateDoc of dateSnapshot.docs) {
-            const subjectsCol = collection(db, "attendance", rollNumber, "records", dateDoc.id, "subjects");
-            const subjectSnapshot = await getDocs(subjectsCol);
-            
-            subjectSnapshot.forEach(subjectDoc => {
-                const record = subjectDoc.data();
-                if (record.status !== 'cancelled') {
-                    totalClasses++;
-                    if (record.status === 'present' || record.status === 'late') {
-                        totalPresent++;
+        modalContent.innerHTML = `<div id="modalLoader"><i class="fas fa-spinner fa-spin"></i><p>Calculating accurate attendance...</p></div>`;
+    
+        try {
+            const semesterStartDate = new Date('2025-08-01T00:00:00'); 
+            const today = new Date();
+    
+            // 1. Fetch all existing attendance records for the student ONCE.
+            const attendanceMap = new Map();
+            const recordsCol = collection(db, "attendance", rollNumber, "records");
+            const dateSnapshot = await getDocs(recordsCol);
+    
+            for (const dateDoc of dateSnapshot.docs) {
+                const subjectsMap = new Map();
+                const subjectsCol = collection(db, "attendance", rollNumber, "records", dateDoc.id, "subjects");
+                const subjectSnapshot = await getDocs(subjectsCol);
+                subjectSnapshot.forEach(subjectDoc => {
+                    subjectsMap.set(subjectDoc.id, subjectDoc.data());
+                });
+                attendanceMap.set(dateDoc.id, subjectsMap);
+            }
+    
+            // 2. Calculate total scheduled and attended classes by iterating through the calendar.
+            let totalScheduledClasses = 0;
+            let totalAttendedClasses = 0;
+            const sectionTimetable = this.configManager.getTimetable(student.section);
+    
+            for (let d = new Date(semesterStartDate); d <= today; d.setDate(d.getDate() + 1)) {
+                const dateStr = d.toISOString().split('T')[0];
+                const dayOfWeek = d.getDay();
+    
+                if (dayOfWeek === 0 || dayOfWeek === 6 || holidays[dateStr]) {
+                    continue; // Skip weekends and holidays
+                }
+    
+                const dayName = d.toLocaleString('en-US', { weekday: 'long' });
+                const daySchedule = sectionTimetable ? sectionTimetable[dayName] : null;
+    
+                if (daySchedule) {
+                    const dailyAttendance = attendanceMap.get(dateStr);
+    
+                    for (const slot of Object.values(daySchedule)) {
+                        if (slot.type.toLowerCase() === 'break' || slot.subject.toLowerCase().includes('study')) {
+                            continue;
+                        }
+    
+                        totalScheduledClasses++;
+                        const record = dailyAttendance ? dailyAttendance.get(slot.subject) : null;
+    
+                        if (record && (record.status === 'present' || record.status === 'late')) {
+                            totalAttendedClasses++;
+                        }
                     }
                 }
-            });
+            }
+    
+            // 3. Render the result.
+            const percentage = totalScheduledClasses > 0 ? Math.round((totalAttendedClasses / totalScheduledClasses) * 100) : 0;
+            const badgeClass = percentage >= 75 ? 'text-success' : percentage >= 60 ? 'text-warning' : 'text-danger';
+    
+            modalContent.innerHTML = `
+                <h3>${student.username}</h3>
+                <p>${student.rollNumber} | Section ${student.section}</p>
+                <div id="modalPercentage" class="${badgeClass}" style="background: none; border: none; padding: 0;">${percentage}%</div>
+                <div class="text-center">
+                    <p><strong>${totalAttendedClasses}</strong> classes attended out of <strong>${totalScheduledClasses}</strong> total scheduled classes.</p>
+                </div>
+            `;
+        } catch (error) {
+            console.error("Error calculating student attendance:", error);
+            modalContent.innerHTML = `<p class="text-danger">Could not calculate attendance. Please try again.</p>`;
         }
-
-        const percentage = totalClasses > 0 ? Math.round((totalPresent / totalClasses) * 100) : 0;
-        const badgeClass = percentage >= 75 ? 'status-present' : percentage >= 60 ? 'status-late' : 'status-absent';
-
-        modalContent.innerHTML = `
-            <h3>${student.username}</h3>
-            <p>${student.rollNumber} | Section ${student.section}</p>
-            <div id="modalPercentage" class="${badgeClass}">${percentage}%</div>
-            <div class="text-center">
-                <p><strong>${totalPresent}</strong> classes attended out of <strong>${totalClasses}</strong> total classes.</p>
-            </div>
-        `;
     }
     
     updateAdminStats() {
@@ -341,7 +389,58 @@ export class AdminDashboard {
         }
     }
 
-    async generateClassReport() {
+    async synchronizeAttendanceForDate(dateStr) {
+        // --- MODIFIED: Only write to DB if the date is on or after the sync start date ---
+        const date = new Date(dateStr + 'T00:00:00');
+        if (date < this.syncStartDate) {
+            console.log(`Skipping DB write for ${dateStr} (before sync start date).`);
+            return;
+        }
+
+        const reportDisplay = document.getElementById('reportDisplay');
+        if (reportDisplay) reportDisplay.innerHTML = `<p class="text-center p-3"><i class="fas fa-sync-alt fa-spin"></i> Synchronizing attendance records for ${dateStr}...</p>`;
+
+        const dayOfWeek = date.getDay();
+
+        if (dayOfWeek === 0 || dayOfWeek === 6 || holidays[dateStr]) {
+            return;
+        }
+
+        const dayName = date.toLocaleString('en-US', { weekday: 'long' });
+
+        for (const sectionId of ['A', 'B']) {
+            const sectionTimetable = this.configManager.getTimetable(sectionId);
+            const daySchedule = sectionTimetable ? sectionTimetable[dayName] : null;
+
+            if (!daySchedule) continue;
+
+            const studentsInSection = this.registeredStudents.filter(s => s.section === sectionId);
+            if (studentsInSection.length === 0) continue;
+
+            const scheduledClasses = Object.values(daySchedule)
+                .filter(slot => slot.type.toLowerCase() !== 'break' && !slot.subject.toLowerCase().includes('study'))
+                .map(slot => slot.subject);
+
+            const uniqueClasses = [...new Set(scheduledClasses)];
+
+            for (const className of uniqueClasses) {
+                for (const student of studentsInSection) {
+                    const attendanceRef = doc(db, "attendance", student.rollNumber, "records", dateStr, "subjects", className);
+                    const docSnap = await getDoc(attendanceRef);
+                    if (!docSnap.exists()) {
+                        await setDoc(attendanceRef, {
+                            status: 'absent',
+                            subject: className,
+                            timestamp: new Date(),
+                            markedBy: 'system'
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+     async generateClassReport() {
         const reportType = document.getElementById('reportType').value;
         const reportDisplay = document.getElementById('reportDisplay');
         reportDisplay.innerHTML = `<p class="text-center p-3">Generating report, please wait...</p>`;
@@ -371,8 +470,10 @@ export class AdminDashboard {
             return;
         }
         const dateStr = dateInput.value;
-        const formattedDate = new Date(dateStr + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+        
+        await this.synchronizeAttendanceForDate(dateStr);
 
+        const formattedDate = new Date(dateStr + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
         let records = [];
         for (const student of this.registeredStudents) {
             const subjectsCol = collection(db, "attendance", student.rollNumber, "records", dateStr, "subjects");
@@ -389,20 +490,21 @@ export class AdminDashboard {
             }
         }
 
-        const headers = ['Roll No', 'Name', 'Section', 'Subject', 'Status', 'Time Marked'];
+        const headers = ['Roll No', 'Name', 'Section', 'Subject', 'Status', 'Marked By', 'Time'];
         const rows = records.map(rec => [
             rec.rollNumber,
             rec.username,
             rec.section,
             rec.subject,
             `<span class="status-badge status-${rec.status}">${rec.status}</span>`,
+            rec.markedBy || 'N/A',
             rec.timestamp ? new Date(rec.timestamp.toDate()).toLocaleTimeString() : 'N/A'
         ]);
         
         this.currentReportData = {
             title: `Daily_Report_${dateStr}`,
             headers: headers,
-            rows: records.map(rec => [rec.rollNumber, rec.username, rec.section, rec.subject, rec.status, rec.timestamp ? new Date(rec.timestamp.toDate()).toLocaleString() : 'N/A'])
+            rows: records.map(rec => [rec.rollNumber, rec.username, rec.section, rec.subject, rec.status, rec.markedBy, rec.timestamp ? new Date(rec.timestamp.toDate()).toLocaleString() : 'N/A'])
         };
 
         this.renderReport(`Daily Report for ${formattedDate}`, headers, rows);
@@ -424,6 +526,10 @@ export class AdminDashboard {
             targetDate.setDate(targetDate.getDate() + i);
             return targetDate.toISOString().split('T')[0];
         });
+
+        for (const dateStr of dates) {
+            await this.synchronizeAttendanceForDate(dateStr);
+        }
 
         const studentStats = {};
         this.registeredStudents.forEach(s => {
@@ -481,6 +587,10 @@ export class AdminDashboard {
         const dates = [];
         for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
             dates.push(new Date(d).toISOString().split('T')[0]);
+        }
+
+        for (const dateStr of dates) {
+            await this.synchronizeAttendanceForDate(dateStr);
         }
 
         const studentStats = {};
@@ -570,7 +680,7 @@ export class AdminDashboard {
         const { title, headers, rows } = this.currentReportData;
 
         const sanitizeRow = row => row.map(cell => {
-            const cellStr = String(cell).replace(/"/g, '""');
+            const cellStr = String(cell).replace(/<[^>]*>?/gm, '').replace(/"/g, '""');
             return `"${cellStr}"`;
         });
         
