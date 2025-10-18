@@ -13,20 +13,17 @@ export class AdminDashboard {
     async init() {
         this.populateClassSelectors();
         await this.loadRegisteredStudents();
-        this.setupReportListeners(); // Set up the new report listeners
+        this.setupReportListeners();
     }
-
-    // --- NEW: Sets up listeners for the reports tab ---
+    
     setupReportListeners() {
         const reportTypeSelect = document.getElementById('reportType');
         if (reportTypeSelect) {
             reportTypeSelect.addEventListener('change', this.updateReportInput.bind(this));
         }
-        // Set the initial input field state when the tab is first loaded
         this.updateReportInput();
     }
 
-    // --- NEW: Dynamically changes the input field (date, week, month) ---
     updateReportInput() {
         const reportType = document.getElementById('reportType').value;
         const dateInputContainer = document.getElementById('reportDateContainer');
@@ -41,7 +38,6 @@ export class AdminDashboard {
                 html = `<label for="reportDateInput">Date</label><input type="date" id="reportDateInput" class="form-control" value="${todayStr}">`;
                 break;
             case 'weekly':
-                 // Format for week input: YYYY-W##
                 const week = Math.ceil((((today - new Date(today.getFullYear(), 0, 1)) / 86400000) + new Date(today.getFullYear(), 0, 1).getDay() + 1) / 7);
                 const weekStr = `${today.getFullYear()}-W${String(week).padStart(2, '0')}`;
                 html = `<label for="reportWeekInput">Week</label><input type="week" id="reportWeekInput" class="form-control" value="${weekStr}">`;
@@ -60,7 +56,7 @@ export class AdminDashboard {
         const selectors = [
             document.getElementById('manualClassSelector'),
             document.getElementById('cancelClassSelector'),
-            document.getElementById('classSelector') // For QR Codes
+            document.getElementById('classSelector')
         ];
 
         selectors.forEach(selector => {
@@ -112,7 +108,26 @@ export class AdminDashboard {
 
         this.renderStudentTable();
         this.updateAdminStats();
+        // --- NEW: Populate the datalist after loading students ---
+        this.populateRollNumberDatalist();
     }
+
+    // --- NEW: Populates the searchable datalist for manual attendance ---
+    populateRollNumberDatalist() {
+        const datalist = document.getElementById('studentRollNumbers');
+        if (!datalist) return;
+
+        datalist.innerHTML = ''; // Clear existing options
+        if (this.registeredStudents.length > 0) {
+            this.registeredStudents.forEach(student => {
+                const option = document.createElement('option');
+                option.value = student.rollNumber;
+                option.textContent = `${student.username} (${student.section})`;
+                datalist.appendChild(option);
+            });
+        }
+    }
+
 
     renderStudentTable() {
         const tbody = document.getElementById('studentTableBody');
@@ -207,13 +222,11 @@ export class AdminDashboard {
         Utils.showAlert(`Successfully cancelled "${className}" for all students on ${cancelDate}.`, 'success');
     }
 
-    // --- UPDATED: Report generation controller ---
     async generateClassReport() {
         const reportType = document.getElementById('reportType').value;
         const reportDisplay = document.getElementById('reportDisplay');
         reportDisplay.innerHTML = `<p class="text-center p-3">Generating report, please wait...</p>`;
 
-        // Ensure we have the latest student data before generating a report
         if (this.registeredStudents.length === 0) {
             await this.loadRegisteredStudents();
         }
@@ -231,7 +244,6 @@ export class AdminDashboard {
         }
     }
 
-    // --- NEW: Generates the Daily Report ---
     async generateDailyReport() {
         const dateInput = document.getElementById('reportDateInput');
         if (!dateInput || !dateInput.value) {
@@ -270,7 +282,6 @@ export class AdminDashboard {
         this.renderReport(`Daily Report for ${formattedDate}`, headers, rows);
     }
     
-    // --- NEW: Generates the Weekly Report ---
     async generateWeeklyReport() {
         const weekInput = document.getElementById('reportWeekInput');
         if (!weekInput || !weekInput.value) {
@@ -279,7 +290,6 @@ export class AdminDashboard {
         }
         const [year, week] = weekInput.value.split('-W');
         
-        // Calculate start and end dates of the selected week
         const d = new Date(`Jan 01, ${year} 01:00:00`);
         const w = d.getTime() + 604800000 * (week -1);
         const weekStart = new Date(w);
@@ -312,7 +322,7 @@ export class AdminDashboard {
         
         const headers = ['Roll No', 'Name', 'Section', 'Classes Attended', 'Total Classes', 'Percentage'];
         const rows = Object.entries(studentStats).map(([rollNumber, stats]) => {
-            if (stats.total === 0) return null; // Don't show students with no classes in the period
+            if (stats.total === 0) return null;
             const percentage = Math.round((stats.present / stats.total) * 100);
             const badgeClass = percentage >= 75 ? 'status-present' : percentage >= 60 ? 'status-late' : 'status-absent';
             return [rollNumber, stats.username, stats.section, stats.present, stats.total, `<span class="status-badge ${badgeClass}">${percentage}%</span>`];
@@ -321,7 +331,6 @@ export class AdminDashboard {
         this.renderReport(`Weekly Report for Week ${week}, ${year}`, headers, rows);
     }
 
-    // --- NEW: Generates the Monthly Defaulter Report ---
     async generateMonthlyReport() {
         const monthInput = document.getElementById('reportMonthInput');
         if (!monthInput || !monthInput.value) {
@@ -374,7 +383,6 @@ export class AdminDashboard {
         this.renderReport(`Monthly Defaulter List (< ${defaulterThreshold}%) for ${monthName} ${year}`, headers, rows);
     }
 
-    // --- NEW: Renders the final report table to the DOM ---
     renderReport(title, headers, rows) {
         const reportDisplay = document.getElementById('reportDisplay');
         if (!reportDisplay) return;
@@ -403,7 +411,6 @@ export class AdminDashboard {
         reportDisplay.innerHTML = tableHTML;
     }
 
-    // --- NEW: Exports the current student list to a CSV file ---
     exportStudentData() {
         if (this.registeredStudents.length === 0) {
             Utils.showAlert('No student data to export.', 'warning');
@@ -412,13 +419,12 @@ export class AdminDashboard {
 
         const headers = ['RollNumber', 'Username', 'Section', 'DeviceID', 'LastLogin'];
         
-        // Use a Set to avoid duplicate rows if a student has multiple device entries somehow
         const studentSet = new Set(this.registeredStudents.map(s => JSON.stringify(s)));
         const uniqueStudents = Array.from(studentSet).map(s => JSON.parse(s));
 
         const rows = uniqueStudents.map(student => [
             student.rollNumber,
-            `"${student.username.replace(/"/g, '""')}"`, // Handle names with quotes
+            `"${student.username.replace(/"/g, '""')}"`,
             student.section,
             student.deviceId || 'N/A',
             student.lastLogin ? new Date(student.lastLogin).toLocaleString() : 'N/A'
@@ -432,7 +438,7 @@ export class AdminDashboard {
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
         link.setAttribute("download", `student_data_${new Date().toISOString().split('T')[0]}.csv`);
-        document.body.appendChild(link); // Required for Firefox
+        document.body.appendChild(link);
 
         link.click();
         document.body.removeChild(link);
@@ -456,4 +462,4 @@ export class AdminDashboard {
         await this.bulkLogout();
       }
     }
-          }
+}
