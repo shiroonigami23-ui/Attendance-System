@@ -1003,3 +1003,92 @@ body {
     color: var(--muted);
     border: 1px solid var(--muted);
 }
+/* --- Additions for New Features --- */
+
+/* clickable roll number */
+.roll-number-link {
+    color: var(--primary);
+    font-weight: 600;
+    text-decoration: underline;
+    cursor: pointer;
+    transition: color 0.3s ease;
+}
+
+.roll-number-link:hover {
+    color: var(--primary-dark);
+}
+
+
+/* Modal Styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(5px);
+    animation: fadeIn 0.3s ease-out;
+}
+
+.modal-content {
+    max-width: 500px;
+    width: 90%;
+    margin: 20px;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+    animation: slideDown 0.4s ease-out;
+}
+
+.modal-close {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    background: none;
+    border: none;
+    font-size: 2rem;
+    color: var(--muted);
+    cursor: pointer;
+    line-height: 1;
+    transition: all 0.2s ease;
+}
+
+.modal-close:hover {
+    color: var(--danger);
+    transform: scale(1.1);
+}
+
+#modalContent h3 {
+    color: var(--primary);
+    margin-bottom: 5px;
+}
+
+#modalContent p {
+    color: var(--muted);
+    margin-bottom: 20px;
+}
+
+#modalLoader {
+    text-align: center;
+    padding: 40px;
+    font-size: 1.2rem;
+    color: var(--muted);
+}
+#modalLoader .fas {
+    font-size: 2rem;
+    margin-bottom: 15px;
+    display: block;
+    animation: spin 1.5s linear infinite;
+}
+
+#modalPercentage {
+    font-size: 4rem;
+    font-weight: 700;
+    text-align: center;
+    margin: 20px 0;
+}
