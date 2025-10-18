@@ -5,44 +5,44 @@ import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc } from "https://
 import { Utils } from './utils.js';
 
 export class AdminDashboard {
-    // --- UPDATED: Accept configManager in constructor ---
     constructor(configManager) {
         this.registeredStudents = [];
-        this.configManager = configManager; // Store the config manager instance
+        this.configManager = configManager;
     }
 
     async init() {
-        this.populateClassSelectors(); // Populate dropdowns first
+        this.populateClassSelectors();
         await this.loadRegisteredStudents();
     }
 
-    // --- NEW FUNCTION: To populate subject dropdowns dynamically ---
     populateClassSelectors() {
         const subjects = this.configManager.getSubjects();
-        const qrSelector = document.getElementById('classSelector');
         const manualSelector = document.getElementById('manualClassSelector');
+        const cancelSelector = document.getElementById('cancelClassSelector'); // New selector for cancellation
 
-        // Clear existing placeholder options
-        qrSelector.innerHTML = '';
         manualSelector.innerHTML = '';
+        cancelSelector.innerHTML = '';
 
         if (subjects.length === 0) {
-            const defaultOption = '<option value="">No subjects found in config</option>';
-            qrSelector.innerHTML = defaultOption;
+            const defaultOption = '<option value="">No subjects found</option>';
             manualSelector.innerHTML = defaultOption;
+            cancelSelector.innerHTML = defaultOption;
             return;
         }
 
         subjects.forEach(subject => {
-            // Create a display-friendly name like "CS501 - Theory of Computation"
             const subjectName = `${subject.code} - ${subject.name}`;
             const option = document.createElement('option');
             option.value = subjectName;
             option.textContent = subjectName;
             
-            // Add the same option to both dropdowns
-            qrSelector.appendChild(option.cloneNode(true));
-            manualSelector.appendChild(option);
+            manualSelector.appendChild(option.cloneNode(true));
+            cancelSelector.appendChild(option);
+        });
+    }
+
+    async loadRegisteredStudents() {
+        // ... same as before
         });
     }
 
@@ -79,7 +79,7 @@ export class AdminDashboard {
     }
 
     renderStudentTable() {
-        const tbody = document.getElementById('studentTableBody');
+        // ... same as before
         tbody.innerHTML = ''; 
 
         if (this.registeredStudents.length === 0) {
@@ -104,13 +104,13 @@ export class AdminDashboard {
     }
     
     updateAdminStats() {
-        document.getElementById('totalStudents').textContent = this.registeredStudents.length;
+        // ... same as before
         document.getElementById('activeStudents').textContent = this.registeredStudents.length;
         document.getElementById('totalDevices').textContent = this.registeredStudents.length;
     }
 
     async forceLogoutStudent(deviceId) {
-        if (confirm(`Are you sure you want to de-register this device?`)) {
+        // ... same as before
             await deleteDoc(doc(db, "devices", deviceId));
             Utils.showAlert('Device de-registered successfully!', 'success');
             await this.loadRegisteredStudents();
@@ -118,7 +118,7 @@ export class AdminDashboard {
     }
 
     async markManualAttendance() {
-        const rollNumber = document.getElementById('manualRollNumber').value;
+        // ... same as before
         const status = document.getElementById('attendanceStatus').value;
         const className = document.getElementById('manualClassSelector').value;
 
@@ -145,26 +145,50 @@ export class AdminDashboard {
         document.getElementById('manualRollNumber').value = '';
     }
 
-    async clearAllDeviceData() {
-        if(confirm("DANGER: This will de-register ALL devices. Are you sure?")) {
-            const devicesSnap = await getDocs(collection(db, "devices"));
-            for (const deviceDoc of devicesSnap.docs) {
-                await deleteDoc(deviceDoc.ref);
-            }
-            Utils.showAlert('All device data cleared!', 'success');
-            await this.loadRegisteredStudents();
-        }
-    }
+    // --- NEW FUNCTION for CANCELLING a CLASS ---
+    async cancelClass() {
+        const cancelDate = document.getElementById('cancelDate').value;
+        const className = document.getElementById('cancelClassSelector').value;
 
-    async generateClassReport() {
-        const reportType = document.getElementById('reportType').value;
-        const reportDate = document.getElementById('reportDate').value;
-
-        if (!reportDate) {
-            Utils.showAlert('Please select a date for the report.', 'warning');
+        if (!cancelDate || !className) {
+            Utils.showAlert('Please select both a date and a class to cancel.', 'warning');
             return;
         }
-        Utils.showAlert(`Generating ${reportType} report for ${reportDate}...`, 'info');
-        console.log(`Generating report with type: ${reportType} and date: ${reportDate}`);
+
+        if (!confirm(`Are you sure you want to cancel the class "${className}" for ALL students on ${cancelDate}? This cannot be undone.`)) {
+            return;
+        }
+
+        Utils.showAlert('Processing cancellation for all students... This may take a moment.', 'info');
+
+        // We need a list of all students to mark the class as cancelled for them.
+        // We'll fetch all users from the 'users' collection.
+        const usersSnap = await getDocs(collection(db, "users"));
+        
+        const cancellationPromises = [];
+
+        usersSnap.forEach(userDoc => {
+            const student = userDoc.data();
+            if (student.role === 'student') {
+                const attendanceRef = doc(db, "attendance", student.rollNumber, "records", cancelDate, "subjects", className);
+                const promise = setDoc(attendanceRef, {
+                    status: 'cancelled',
+                    subject: className,
+                    timestamp: new Date(),
+                    markedBy: 'admin'
+                });
+                cancellationPromises.push(promise);
+            }
+        });
+
+        try {
+            await Promise.all(cancellationPromises);
+            Utils.showAlert(`Successfully cancelled "${className}" for all students on ${cancelDate}.`, 'success');
+        } catch (error) {
+            console.error("Error cancelling class: ", error);
+            Utils.showAlert('An error occurred during cancellation. Please check the console.', 'danger');
+        }
     }
-}
+
+    async clearAllDeviceData() {
+        // ... same as before
