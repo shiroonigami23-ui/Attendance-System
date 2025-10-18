@@ -1,3 +1,5 @@
+// js/admin.js
+
 import { db } from './firebase-config.js';
 import { collection, getDocs, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 import { Utils } from './utils.js';
@@ -11,7 +13,47 @@ export class AdminDashboard {
     async init() {
         this.populateClassSelectors();
         await this.loadRegisteredStudents();
+        this.setupReportListeners(); // Set up the new report listeners
     }
+
+    // --- NEW: Sets up listeners for the reports tab ---
+    setupReportListeners() {
+        const reportTypeSelect = document.getElementById('reportType');
+        if (reportTypeSelect) {
+            reportTypeSelect.addEventListener('change', this.updateReportInput.bind(this));
+        }
+        // Set the initial input field state when the tab is first loaded
+        this.updateReportInput();
+    }
+
+    // --- NEW: Dynamically changes the input field (date, week, month) ---
+    updateReportInput() {
+        const reportType = document.getElementById('reportType').value;
+        const dateInputContainer = document.getElementById('reportDateContainer');
+        if (!dateInputContainer) return;
+
+        let html = '';
+        const today = new Date();
+        const todayStr = today.toISOString().split('T')[0];
+
+        switch (reportType) {
+            case 'daily':
+                html = `<label for="reportDateInput">Date</label><input type="date" id="reportDateInput" class="form-control" value="${todayStr}">`;
+                break;
+            case 'weekly':
+                 // Format for week input: YYYY-W##
+                const week = Math.ceil((((today - new Date(today.getFullYear(), 0, 1)) / 86400000) + new Date(today.getFullYear(), 0, 1).getDay() + 1) / 7);
+                const weekStr = `${today.getFullYear()}-W${String(week).padStart(2, '0')}`;
+                html = `<label for="reportWeekInput">Week</label><input type="week" id="reportWeekInput" class="form-control" value="${weekStr}">`;
+                break;
+            case 'monthly':
+                const monthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+                html = `<label for="reportMonthInput">Month</label><input type="month" id="reportMonthInput" class="form-control" value="${monthStr}">`;
+                break;
+        }
+        dateInputContainer.innerHTML = html;
+    }
+
 
     populateClassSelectors() {
         const subjects = this.configManager.getSubjects();
@@ -165,10 +207,200 @@ export class AdminDashboard {
         Utils.showAlert(`Successfully cancelled "${className}" for all students on ${cancelDate}.`, 'success');
     }
 
-    // --- RESTORED/ADDED FUNCTIONS ---
-    generateClassReport() {
-        // This is a placeholder as requested.
-        Utils.showAlert('CSV Report generation is a planned feature and not yet implemented.', 'info');
+    // --- UPDATED: Report generation controller ---
+    async generateClassReport() {
+        const reportType = document.getElementById('reportType').value;
+        const reportDisplay = document.getElementById('reportDisplay');
+        reportDisplay.innerHTML = `<p class="text-center p-3">Generating report, please wait...</p>`;
+
+        // Ensure we have the latest student data before generating a report
+        if (this.registeredStudents.length === 0) {
+            await this.loadRegisteredStudents();
+        }
+        
+        switch (reportType) {
+            case 'daily':
+                await this.generateDailyReport();
+                break;
+            case 'weekly':
+                await this.generateWeeklyReport();
+                break;
+            case 'monthly':
+                await this.generateMonthlyReport();
+                break;
+        }
+    }
+
+    // --- NEW: Generates the Daily Report ---
+    async generateDailyReport() {
+        const dateInput = document.getElementById('reportDateInput');
+        if (!dateInput || !dateInput.value) {
+            Utils.showAlert('Please select a date.', 'warning');
+            return;
+        }
+        const dateStr = dateInput.value;
+        const formattedDate = new Date(dateStr + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+
+        let records = [];
+        for (const student of this.registeredStudents) {
+            const subjectsCol = collection(db, "attendance", student.rollNumber, "records", dateStr, "subjects");
+            const subjectSnapshot = await getDocs(subjectsCol);
+            if (!subjectSnapshot.empty) {
+                subjectSnapshot.forEach(doc => {
+                    records.push({
+                        rollNumber: student.rollNumber,
+                        username: student.username,
+                        section: student.section,
+                        ...doc.data()
+                    });
+                });
+            }
+        }
+
+        const headers = ['Roll No', 'Name', 'Section', 'Subject', 'Status', 'Time Marked'];
+        const rows = records.map(rec => [
+            rec.rollNumber,
+            rec.username,
+            rec.section,
+            rec.subject,
+            `<span class="status-badge status-${rec.status}">${rec.status}</span>`,
+            rec.timestamp ? new Date(rec.timestamp.toDate()).toLocaleTimeString() : 'N/A'
+        ]);
+
+        this.renderReport(`Daily Report for ${formattedDate}`, headers, rows);
+    }
+    
+    // --- NEW: Generates the Weekly Report ---
+    async generateWeeklyReport() {
+        const weekInput = document.getElementById('reportWeekInput');
+        if (!weekInput || !weekInput.value) {
+            Utils.showAlert('Please select a week.', 'warning');
+            return;
+        }
+        const [year, week] = weekInput.value.split('-W');
+        
+        // Calculate start and end dates of the selected week
+        const d = new Date(`Jan 01, ${year} 01:00:00`);
+        const w = d.getTime() + 604800000 * (week -1);
+        const weekStart = new Date(w);
+        const dates = Array.from({length: 7}, (_, i) => {
+            const targetDate = new Date(weekStart);
+            targetDate.setDate(targetDate.getDate() + i);
+            return targetDate.toISOString().split('T')[0];
+        });
+
+        const studentStats = {};
+        this.registeredStudents.forEach(s => {
+            studentStats[s.rollNumber] = { username: s.username, section: s.section, present: 0, total: 0 };
+        });
+
+        for (const dateStr of dates) {
+            for (const student of this.registeredStudents) {
+                const subjectsCol = collection(db, "attendance", student.rollNumber, "records", dateStr, "subjects");
+                const subjectSnapshot = await getDocs(subjectsCol);
+                subjectSnapshot.forEach(doc => {
+                    const data = doc.data();
+                    if (data.status !== 'cancelled') {
+                        studentStats[student.rollNumber].total++;
+                        if (data.status === 'present' || data.status === 'late') {
+                            studentStats[student.rollNumber].present++;
+                        }
+                    }
+                });
+            }
+        }
+        
+        const headers = ['Roll No', 'Name', 'Section', 'Classes Attended', 'Total Classes', 'Percentage'];
+        const rows = Object.entries(studentStats).map(([rollNumber, stats]) => {
+            if (stats.total === 0) return null; // Don't show students with no classes in the period
+            const percentage = Math.round((stats.present / stats.total) * 100);
+            const badgeClass = percentage >= 75 ? 'status-present' : percentage >= 60 ? 'status-late' : 'status-absent';
+            return [rollNumber, stats.username, stats.section, stats.present, stats.total, `<span class="status-badge ${badgeClass}">${percentage}%</span>`];
+        }).filter(row => row !== null);
+
+        this.renderReport(`Weekly Report for Week ${week}, ${year}`, headers, rows);
+    }
+
+    // --- NEW: Generates the Monthly Defaulter Report ---
+    async generateMonthlyReport() {
+        const monthInput = document.getElementById('reportMonthInput');
+        if (!monthInput || !monthInput.value) {
+            Utils.showAlert('Please select a month.', 'warning');
+            return;
+        }
+        const [year, month] = monthInput.value.split('-');
+        
+        const startDate = new Date(year, month - 1, 1);
+        const endDate = new Date(year, month, 0);
+
+        const dates = [];
+        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+            dates.push(new Date(d).toISOString().split('T')[0]);
+        }
+
+        const studentStats = {};
+        this.registeredStudents.forEach(s => {
+            studentStats[s.rollNumber] = { username: s.username, section: s.section, present: 0, total: 0 };
+        });
+
+        for (const dateStr of dates) {
+            for (const student of this.registeredStudents) {
+                const subjectsCol = collection(db, "attendance", student.rollNumber, "records", dateStr, "subjects");
+                const subjectSnapshot = await getDocs(subjectsCol);
+                subjectSnapshot.forEach(doc => {
+                    const data = doc.data();
+                    if (data.status !== 'cancelled') {
+                        studentStats[student.rollNumber].total++;
+                        if (data.status === 'present' || data.status === 'late') {
+                            studentStats[student.rollNumber].present++;
+                        }
+                    }
+                });
+            }
+        }
+
+        const headers = ['Roll No', 'Name', 'Section', 'Attendance Percentage'];
+        const defaulterThreshold = 75;
+        const rows = Object.entries(studentStats)
+            .map(([rollNumber, stats]) => {
+                if (stats.total === 0) return null;
+                const percentage = Math.round((stats.present / stats.total) * 100);
+                return { rollNumber, stats, percentage };
+            })
+            .filter(item => item && item.percentage < defaulterThreshold)
+            .map(item => [item.rollNumber, item.stats.username, item.stats.section, `<span class="status-badge status-absent">${item.percentage}%</span>`]);
+
+        const monthName = new Date(year, month - 1).toLocaleString('default', { month: 'long' });
+        this.renderReport(`Monthly Defaulter List (< ${defaulterThreshold}%) for ${monthName} ${year}`, headers, rows);
+    }
+
+    // --- NEW: Renders the final report table to the DOM ---
+    renderReport(title, headers, rows) {
+        const reportDisplay = document.getElementById('reportDisplay');
+        if (!reportDisplay) return;
+
+        if (rows.length === 0) {
+            reportDisplay.innerHTML = `
+                <h4 class="card-title mt-4">${title}</h4>
+                <p class="text-center text-muted mt-3 p-3">No data found for the selected period.</p>
+            `;
+            return;
+        }
+
+        let tableHTML = `
+            <h4 class="card-title mt-4">${title}</h4>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
+                    </thead>
+                    <tbody>
+                        ${rows.map(row => `<tr>${row.map(cell => `<td>${cell}</td>`).join('')}</tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+        reportDisplay.innerHTML = tableHTML;
     }
 
     async bulkLogout() {
@@ -184,7 +416,6 @@ export class AdminDashboard {
 
     async clearAllDeviceData() {
       if(confirm("DANGER: This will de-register ALL devices. Are you sure?")) {
-        // This is an alias for bulkLogout in this context
         await this.bulkLogout();
       }
     }
