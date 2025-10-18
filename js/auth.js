@@ -23,23 +23,16 @@ export class AuthManager {
             return null;
         }
 
-        // --- NEW & IMPROVED TWO-WAY DEVICE LOCK LOGIC ---
-
-        // 1. Check if THIS device is registered to any student.
+        // --- TWO-WAY DEVICE LOCK LOGIC ---
         const thisDeviceRegistration = await this.getDeviceRegistration();
-
-        // 2. Check if the STUDENT trying to log in is registered on ANY other device.
         const studentDeviceQuery = query(collection(db, "devices"), where("rollNumber", "==", rollNumber));
         const studentDeviceSnap = await getDocs(studentDeviceQuery);
         let studentRegisteredDeviceId = null;
         if (!studentDeviceSnap.empty) {
-            // Student's account is already tied to a device. Get that device's ID.
             studentRegisteredDeviceId = studentDeviceSnap.docs[0].id;
         }
 
-        // --- APPLY STRICT SECURITY CHECKS ---
-
-        // SCENARIO 1: This device is already taken by a DIFFERENT student. BLOCK.
+        // --- SECURITY CHECKS ---
         if (thisDeviceRegistration && thisDeviceRegistration.rollNumber !== rollNumber) {
             Utils.showAlert('This device is registered to another user.', 'danger');
             document.getElementById('deviceWarning').classList.remove('hidden');
@@ -47,25 +40,18 @@ export class AuthManager {
             return null;
         }
 
-        // SCENARIO 2: This student's account is already locked to a DIFFERENT device. BLOCK.
         if (studentRegisteredDeviceId && studentRegisteredDeviceId !== this.deviceId) {
-            Utils.showAlert('Your account is locked to another device. Please use your original registered device or contact an admin.', 'danger');
+            Utils.showAlert('Your account is locked to another device. Use your original device or contact an admin.', 'danger');
             document.getElementById('deviceWarning').classList.remove('hidden');
             document.getElementById('authContainer').classList.add('hidden');
             return null;
         }
         
-        // --- If all checks pass, proceed with login ---
-        const userData = {
-            rollNumber,
-            username: Utils.sanitizeInput(username),
-            password, // In a real app, this should be hashed!
-            section,
-            role: 'student'
-        };
-
+        // --- LOGIN & REGISTRATION LOGIC ---
         const userRef = doc(db, "users", rollNumber);
         const userSnap = await getDoc(userRef);
+
+        let userData;
 
         if (userSnap.exists()) {
             // User exists, "log them in"
@@ -74,12 +60,22 @@ export class AuthManager {
                  Utils.showAlert('Incorrect password.', 'danger');
                  return null;
             }
+            userData = existingData; // Use the existing user data
         } else {
-            // New user, register them
+            // --- THIS IS THE CRITICAL FIX ---
+            // New user, create their data object FIRST
+            userData = {
+                rollNumber,
+                username: Utils.sanitizeInput(username),
+                password, // In a real app, hash this!
+                section,
+                role: 'student'
+            };
+            // Now, save (register) them in the users collection
             await setDoc(userRef, userData);
         }
 
-        // Register or update the device to this user. This is now safe.
+        // Register or update the device to this user.
         const deviceRef = doc(db, "devices", this.deviceId);
         await setDoc(deviceRef, {
             rollNumber,
