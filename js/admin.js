@@ -14,11 +14,9 @@ export class AdminDashboard {
         this.populateClassSelectors();
         await this.loadRegisteredStudents();
         this.setupReportListeners();
-        // --- NEW: Set default date for manual attendance ---
         this.setManualAttendanceDate();
     }
 
-    // --- NEW: Sets the manual attendance date input to today by default ---
     setManualAttendanceDate() {
         const dateInput = document.getElementById('manualAttendanceDate');
         if (dateInput) {
@@ -179,12 +177,10 @@ export class AdminDashboard {
         }
     }
 
-    // --- UPDATED with Date Picker and Timetable Validation ---
     async markManualAttendance() {
         const rollNumber = document.getElementById('manualRollNumber').value;
         const status = document.getElementById('attendanceStatus').value;
         const className = document.getElementById('manualClassSelector').value;
-        // --- NEW: Read date from the new input field ---
         const dateInput = document.getElementById('manualAttendanceDate');
         const dateStr = dateInput.value;
 
@@ -193,8 +189,7 @@ export class AdminDashboard {
             return;
         }
         
-        // --- VALIDATION LOGIC using the selected date ---
-        const selectedDate = new Date(dateStr + 'T00:00:00'); // Use selected date
+        const selectedDate = new Date(dateStr + 'T00:00:00');
         const student = this.registeredStudents.find(s => s.rollNumber === rollNumber);
 
         if (!student) {
@@ -219,7 +214,6 @@ export class AdminDashboard {
             return;
         }
 
-        // If validation passes, proceed to save the record with the selected date
         const attendanceRef = doc(db, "attendance", rollNumber, "records", dateStr, "subjects", className);
         
         await setDoc(attendanceRef, { 
@@ -232,9 +226,11 @@ export class AdminDashboard {
         Utils.showAlert(`Attendance marked for ${rollNumber} in ${className}!`, 'success');
         document.getElementById('manualRollNumber').value = '';
     }
-
+    
+    // --- UPDATED to read from the date picker ---
     async cancelClass() {
-        const cancelDate = document.getElementById('cancelDate').value;
+        // --- FIX: Read the value from the correct input field ---
+        const cancelDate = document.getElementById('cancelDate').value; 
         const className = document.getElementById('cancelClassSelector').value;
 
         if (!cancelDate || !className) {
@@ -471,7 +467,8 @@ export class AdminDashboard {
         const csvContent = "data:text/csv;charset=utf-8," 
             + headers.join(',') + '\n' 
             + rows.map(e => e.join(',')).join('\n');
-const encodedUri = encodeURI(csvContent);
+
+        const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
         link.setAttribute("download", `student_data_${new Date().toISOString().split('T')[0]}.csv`);
@@ -500,4 +497,3 @@ const encodedUri = encodeURI(csvContent);
       }
     }
 }
-                                                      
