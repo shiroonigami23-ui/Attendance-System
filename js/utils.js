@@ -103,36 +103,29 @@ export const Utils = {
         return `device_${Math.abs(hash)}`;
     },
     
-    // --- UPDATED: Stricter Roll Number Validation ---
     isValidRollNumber(rollNumber, configManager) {
         if (!rollNumber) return false;
         const ranges = configManager.getRollNumberRanges();
         
         for (const range of ranges) {
-            // 1. Check if the roll number starts with the correct prefix
             if (!rollNumber.startsWith(range.prefix)) {
-                continue; // Not this range, check the next one
+                continue;
             }
-
-            // 2. Check if the total length is correct
-            // Example: prefix "0902CS231" (9) + start/end "001" (3) = 12 characters
             const expectedLength = range.prefix.length + range.start.length;
             if (rollNumber.length !== expectedLength) {
-                continue; // Length doesn't match, invalid
+                continue;
             }
-
-            // 3. Check if the numeric part is within the allowed range
             const numPart = rollNumber.substring(range.prefix.length);
             const num = parseInt(numPart, 10);
             const start = parseInt(range.start, 10);
             const end = parseInt(range.end, 10);
 
             if (!isNaN(num) && num >= start && num <= end) {
-                return true; // It's a valid roll number for this range
+                return true;
             }
         }
         
-        return false; // If we get here, no range matched
+        return false;
     },
 
     showAlert(message, type = 'info', duration = 5000) {
@@ -150,8 +143,32 @@ export const Utils = {
         alert.innerHTML = `<i class="alert-icon fas ${icons[type]}"></i><span>${message}</span>`;
         alertContainer.appendChild(alert);
 
-        setTimeout(() => alert.remove(), duration);
+        if (duration > 0) {
+            setTimeout(() => alert.remove(), duration);
+        }
     },
+
+    // --- NEW: Notification Permission and Display Logic ---
+    async requestNotificationPermission() {
+        if (!("Notification" in window)) {
+            console.warn("This browser does not support desktop notification");
+            return;
+        }
+        if (Notification.permission === 'default') {
+            await Notification.requestPermission();
+        }
+    },
+
+    showNotification(title, options = {}) {
+        if (Notification.permission === 'granted') {
+            new Notification(title, {
+                body: options.body || '',
+                icon: './favicon.ico', // Optional: Add an icon for your app
+                ...options
+            });
+        }
+    },
+
 
     formatTime: (date = new Date()) => date.toLocaleTimeString('en-US', { hour12: true, hour: '2-digit', minute: '2-digit' }),
     formatDate: (date = new Date()) => date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
