@@ -117,6 +117,10 @@ window.markManualAttendance = () => window.app.adminDashboard.markManualAttendan
 window.clearDeviceData = () => window.app.adminDashboard.clearAllDeviceData();
 window.refreshAdminData = () => window.app.adminDashboard.loadRegisteredStudents();
 
+// --- ADDED THIS LINE ---
+window.generateClassReport = () => window.app.adminDashboard.generateClassReport();
+
+
 document.addEventListener('DOMContentLoaded', () => {
     window.app.init();
 });
