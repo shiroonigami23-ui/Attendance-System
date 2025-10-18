@@ -17,20 +17,21 @@ export class AdminDashboard {
 
     populateClassSelectors() {
         const subjects = this.configManager.getSubjects();
-        const manualSelector = document.getElementById('manualClassSelector');
-        const cancelSelector = document.getElementById('cancelClassSelector');
-        const classSelector = document.getElementById('classSelector');
+        const selectors = [
+            document.getElementById('manualClassSelector'),
+            document.getElementById('cancelClassSelector'),
+            document.getElementById('classSelector') // For QR Codes
+        ];
 
-        // Clear existing options
-        manualSelector.innerHTML = '';
-        cancelSelector.innerHTML = '';
-        classSelector.innerHTML = '';
+        selectors.forEach(selector => {
+            if (selector) selector.innerHTML = '';
+        });
 
         if (subjects.length === 0) {
             const defaultOption = '<option value="">No subjects found</option>';
-            manualSelector.innerHTML = defaultOption;
-            cancelSelector.innerHTML = defaultOption;
-            classSelector.innerHTML = defaultOption;
+            selectors.forEach(selector => {
+                if (selector) selector.innerHTML = defaultOption;
+            });
             return;
         }
 
@@ -40,37 +41,35 @@ export class AdminDashboard {
             option.value = subjectName;
             option.textContent = subjectName;
             
-            manualSelector.appendChild(option.cloneNode(true));
-            cancelSelector.appendChild(option.cloneNode(true));
-            classSelector.appendChild(option);
+            selectors.forEach(selector => {
+                if (selector) selector.appendChild(option.cloneNode(true));
+            });
         });
     }
-    
-    async loadRegisteredStudents() {
-        console.log("Admin: Fetching registered devices...");
-        const devicesSnap = await getDocs(collection(db, "devices"));
 
-        const studentPromises = devicesSnap.docs.map(async (deviceDoc) => {
-            const deviceData = deviceDoc.data();
-            if (!deviceData.rollNumber) {
-                console.warn(`Device ${deviceDoc.id} has no rollNumber, skipping.`);
-                return null;
-            }
-            try {
-                const userSnap = await getDoc(doc(db, "users", deviceData.rollNumber));
-                if (userSnap.exists()) {
-                    return { ...userSnap.data(), deviceId: deviceDoc.id, lastLogin: deviceData.lastLogin };
-                }
-                return null;
-            } catch (error) {
-                console.error(`Error fetching user ${deviceData.rollNumber}:`, error);
-                return null;
-            }
+    async loadRegisteredStudents() {
+        console.log("Admin: Fetching registered students...");
+        const usersSnap = await getDocs(collection(db, "users"));
+        const devicesSnap = await getDocs(collection(db, "devices"));
+        
+        const deviceMap = new Map();
+        devicesSnap.forEach(doc => {
+            deviceMap.set(doc.data().rollNumber, { deviceId: doc.id, lastLogin: doc.data().lastLogin });
         });
 
-        const resolvedStudents = await Promise.all(studentPromises);
-        this.registeredStudents = resolvedStudents.filter(student => student !== null);
-        
+        this.registeredStudents = usersSnap.docs
+            .map(doc => {
+                const student = doc.data();
+                if (student.role !== 'student') return null;
+                const deviceInfo = deviceMap.get(student.rollNumber);
+                return {
+                    ...student,
+                    deviceId: deviceInfo?.deviceId,
+                    lastLogin: deviceInfo?.lastLogin
+                };
+            })
+            .filter(student => student !== null);
+
         this.renderStudentTable();
         this.updateAdminStats();
     }
@@ -80,35 +79,37 @@ export class AdminDashboard {
         tbody.innerHTML = ''; 
 
         if (this.registeredStudents.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="7" class="text-center">No registered students found.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align: center;">No registered students found.</td></tr>`;
             return;
         }
 
         this.registeredStudents.forEach(student => {
             const row = document.createElement('tr');
             const lastLoginDate = student.lastLogin ? new Date(student.lastLogin).toLocaleString() : 'N/A';
+            const deviceIdText = student.deviceId ? `${student.deviceId.substring(0, 15)}...` : 'Not Registered';
+            const actionButton = student.deviceId ? `<button class="btn btn-sm btn-danger" onclick="window.app.adminDashboard.forceLogoutStudent('${student.deviceId}')"><i class="fas fa-sign-out-alt"></i></button>` : '';
+
             row.innerHTML = `
                 <td>${student.rollNumber || 'N/A'}</td>
                 <td>${student.username || 'N/A'}</td>
                 <td>${student.section || 'N/A'}</td>
-                <td>${student.deviceId ? student.deviceId.substring(0, 15) : 'N/A'}...</td>
+                <td>${deviceIdText}</td>
                 <td>${lastLoginDate}</td>
                 <td><span class="status-badge status-present">Active</span></td>
-                <td><button class="btn btn-sm btn-danger" onclick="window.app.adminDashboard.forceLogoutStudent('${student.deviceId}')"><i class="fas fa-sign-out-alt"></i></button></td>
+                <td>${actionButton}</td>
             `;
             tbody.appendChild(row);
         });
     }
     
     updateAdminStats() {
-        const totalStudents = this.registeredStudents.length;
-        document.getElementById('totalStudents').textContent = totalStudents;
-        document.getElementById('activeStudents').textContent = totalStudents;
-        document.getElementById('totalDevices').textContent = totalStudents;
+        document.getElementById('totalStudents').textContent = this.registeredStudents.length;
+        document.getElementById('activeStudents').textContent = this.registeredStudents.filter(s => s.deviceId).length;
+        document.getElementById('totalDevices').textContent = this.registeredStudents.filter(s => s.deviceId).length;
     }
 
     async forceLogoutStudent(deviceId) {
-        if (confirm(`Are you sure you want to de-register this device?`)) {
+        if (confirm(`Are you sure you want to de-register this device? The student will need to log in again.`)) {
             await deleteDoc(doc(db, "devices", deviceId));
             Utils.showAlert('Device de-registered successfully!', 'success');
             await this.loadRegisteredStudents();
@@ -121,7 +122,7 @@ export class AdminDashboard {
         const className = document.getElementById('manualClassSelector').value;
 
         if (!rollNumber || !className) {
-            Utils.showAlert('Please provide all details.', 'warning');
+            Utils.showAlert('Please provide a roll number and select a class.', 'warning');
             return;
         }
 
@@ -148,44 +149,45 @@ export class AdminDashboard {
             return;
         }
 
-        if (!confirm(`Are you sure you want to cancel "${className}" for ALL students on ${cancelDate}?`)) {
-            return;
-        }
+        if (!confirm(`Are you sure you want to cancel "${className}" for ALL students on ${cancelDate}?`)) return;
 
-        Utils.showAlert('Processing cancellation...', 'info');
-        const usersSnap = await getDocs(collection(db, "users"));
-        const promises = usersSnap.docs.map(userDoc => {
-            const student = userDoc.data();
-            if (student.role === 'student') {
-                const attendanceRef = doc(db, "attendance", student.rollNumber, "records", cancelDate, "subjects", className);
-                return setDoc(attendanceRef, {
-                    status: 'cancelled',
-                    subject: className,
-                    timestamp: new Date(),
-                    markedBy: 'admin'
-                });
-            }
+        Utils.showAlert('Processing cancellation for all registered students...', 'info');
+        
+        const cancellationPromises = this.registeredStudents.map(student => {
+            const attendanceRef = doc(db, "attendance", student.rollNumber, "records", cancelDate, "subjects", className);
+            return setDoc(attendanceRef, {
+                status: 'cancelled',
+                subject: className,
+                timestamp: new Date(),
+                markedBy: 'admin'
+            });
         });
 
-        await Promise.all(promises);
+        await Promise.all(cancellationPromises);
         Utils.showAlert(`Successfully cancelled "${className}" for all students on ${cancelDate}.`, 'success');
     }
-    
-    // --- MISSING FUNCTION ADDED ---
+
+    // --- RESTORED/ADDED FUNCTIONS ---
+    generateClassReport() {
+        // This is a placeholder as requested.
+        Utils.showAlert('CSV Report generation is a planned feature and not yet implemented.', 'info');
+    }
+
     async bulkLogout() {
-        if(confirm("DANGER: This will de-register ALL devices and force every student to log in again. Are you sure?")) {
-            Utils.showAlert('De-registering all devices...', 'info');
+        if (confirm("DANGER: This will de-register ALL devices, forcing every student to log in again. Are you sure?")) {
+            Utils.showAlert('De-registering all devices... This may take a moment.', 'info');
             const devicesSnap = await getDocs(collection(db, "devices"));
             const promises = devicesSnap.docs.map(d => deleteDoc(d.ref));
             await Promise.all(promises);
-            Utils.showAlert('All devices have been de-registered.', 'success');
+            Utils.showAlert('All devices have been successfully de-registered.', 'success');
             await this.loadRegisteredStudents();
         }
     }
 
-    async clearAllDeviceData() {
-        if(confirm("DANGER: This will de-register ALL devices. Are you sure?")) {
+    async clearAllDeviceData() {if(confirm("DANGER: This will de-register ALL devices. Are you sure?")) {
+        // This is an alias for bulkLogout in this context
             const devicesSnap = await getDocs(collection(db, "devices"));
+        await this.bulkLogout();
             const promises = devicesSnap.docs.map(deviceDoc => deleteDoc(deviceDoc.ref));
             await Promise.all(promises);
             Utils.showAlert('All device data cleared!', 'success');
