@@ -188,48 +188,58 @@ export class AdminDashboard {
             Utils.showAlert('Please select a date, roll number, and class.', 'warning');
             return;
         }
-        
+
         const selectedDate = new Date(dateStr + 'T00:00:00');
         const student = this.registeredStudents.find(s => s.rollNumber === rollNumber);
-
         if (!student) {
             Utils.showAlert(`Student with roll number ${rollNumber} not found.`, 'danger');
             return;
         }
-        
+
         const dayOfWeek = selectedDate.toLocaleString('en-US', { weekday: 'long' });
         const timetable = this.configManager.getTimetable(student.section);
         const daySchedule = timetable ? timetable[dayOfWeek] : null;
-
         if (!daySchedule) {
             Utils.showAlert(`No classes are scheduled on ${dayOfWeek} for Section ${student.section}.`, 'warning');
             return;
         }
 
-        const classCode = className.split(' - ')[0];
-        const isClassScheduled = Object.values(daySchedule).some(slot => slot.subject.includes(classCode));
+        // --- FIX: Make comparison robust to spacing differences ---
+        const classCode = className.split(' - ')[0].replace(/\s/g, ''); // e.g., "CS501"
+        const isClassScheduled = Object.values(daySchedule).some(slot => {
+            const slotSubjectCode = slot.subject.replace(/\s/g, ''); // e.g., "CS501" or "CS506LABB1+B2"
+            return slotSubjectCode.includes(classCode);
+        });
 
         if (!isClassScheduled) {
             Utils.showAlert(`The class "${className}" is not scheduled on ${dayOfWeek} for Section ${student.section}.`, 'warning');
+            console.warn('Validation Failed:', { className, classCode, dayOfWeek, daySchedule });
             return;
         }
 
+        // --- FIX: Add proper error handling for the database write ---
         const attendanceRef = doc(db, "attendance", rollNumber, "records", dateStr, "subjects", className);
-        
-        await setDoc(attendanceRef, { 
-            status, 
-            subject: className,
-            timestamp: new Date(), 
-            markedBy: 'admin' 
-        });
+        console.log('Attempting to write to Firestore path:', attendanceRef.path);
 
-        Utils.showAlert(`Attendance marked for ${rollNumber} in ${className}!`, 'success');
-        document.getElementById('manualRollNumber').value = '';
+        try {
+            await setDoc(attendanceRef, {
+                status,
+                subject: className,
+                timestamp: new Date(),
+                markedBy: 'admin'
+            });
+
+            Utils.showAlert(`Attendance marked for ${rollNumber} in ${className}!`, 'success');
+            console.log('Successfully wrote to Firestore!');
+            document.getElementById('manualRollNumber').value = '';
+
+        } catch (error) {
+            console.error("FIREBASE WRITE FAILED:", error);
+            Utils.showAlert(`Failed to save attendance. Check console for errors.`, 'danger');
+        }
     }
     
-    // --- UPDATED to read from the date picker ---
     async cancelClass() {
-        // --- FIX: Read the value from the correct input field ---
         const cancelDate = document.getElementById('cancelDate').value; 
         const className = document.getElementById('cancelClassSelector').value;
 
