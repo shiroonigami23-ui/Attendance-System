@@ -996,3 +996,10 @@ body {
 .calendar-day.holiday:hover {
     background: rgba(159, 122, 234, 0.3);
 }
+/* --- Additions for Reports --- */
+
+.status-cancelled {
+    background: rgba(113, 128, 150, 0.15);
+    color: var(--muted);
+    border: 1px solid var(--muted);
+}
