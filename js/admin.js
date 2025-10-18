@@ -1,7 +1,7 @@
 // js/admin.js
 
 import { db } from './firebase-config.js';
-import { collection, getDocs, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+import { collection, getDocs, doc, setDoc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 import { Utils } from './utils.js';
 
 export class AdminDashboard {
@@ -177,9 +177,10 @@ export class AdminDashboard {
         }
     }
 
+    // --- UPDATED to prevent duplicates and allow updates ---
     async markManualAttendance() {
         const rollNumber = document.getElementById('manualRollNumber').value;
-        const status = document.getElementById('attendanceStatus').value;
+        const newStatus = document.getElementById('attendanceStatus').value;
         const className = document.getElementById('manualClassSelector').value;
         const dateInput = document.getElementById('manualAttendanceDate');
         const dateStr = dateInput.value;
@@ -189,13 +190,13 @@ export class AdminDashboard {
             return;
         }
 
+        // --- Timetable Validation (as before) ---
         const selectedDate = new Date(dateStr + 'T00:00:00');
         const student = this.registeredStudents.find(s => s.rollNumber === rollNumber);
         if (!student) {
             Utils.showAlert(`Student with roll number ${rollNumber} not found.`, 'danger');
             return;
         }
-
         const dayOfWeek = selectedDate.toLocaleString('en-US', { weekday: 'long' });
         const timetable = this.configManager.getTimetable(student.section);
         const daySchedule = timetable ? timetable[dayOfWeek] : null;
@@ -203,39 +204,50 @@ export class AdminDashboard {
             Utils.showAlert(`No classes are scheduled on ${dayOfWeek} for Section ${student.section}.`, 'warning');
             return;
         }
-
-        // --- FIX: Make comparison robust to spacing differences ---
-        const classCode = className.split(' - ')[0].replace(/\s/g, ''); // e.g., "CS501"
-        const isClassScheduled = Object.values(daySchedule).some(slot => {
-            const slotSubjectCode = slot.subject.replace(/\s/g, ''); // e.g., "CS501" or "CS506LABB1+B2"
-            return slotSubjectCode.includes(classCode);
-        });
-
+        const classCode = className.split(' - ')[0].replace(/\s/g, '');
+        const isClassScheduled = Object.values(daySchedule).some(slot => slot.subject.replace(/\s/g, '').includes(classCode));
         if (!isClassScheduled) {
             Utils.showAlert(`The class "${className}" is not scheduled on ${dayOfWeek} for Section ${student.section}.`, 'warning');
-            console.warn('Validation Failed:', { className, classCode, dayOfWeek, daySchedule });
             return;
         }
 
-        // --- FIX: Add proper error handling for the database write ---
+        // --- NEW LOGIC: Check for existing record ---
         const attendanceRef = doc(db, "attendance", rollNumber, "records", dateStr, "subjects", className);
-        console.log('Attempting to write to Firestore path:', attendanceRef.path);
-
+        
         try {
-            await setDoc(attendanceRef, {
-                status,
-                subject: className,
-                timestamp: new Date(),
-                markedBy: 'admin'
-            });
+            const docSnap = await getDoc(attendanceRef);
 
-            Utils.showAlert(`Attendance marked for ${rollNumber} in ${className}!`, 'success');
-            console.log('Successfully wrote to Firestore!');
-            document.getElementById('manualRollNumber').value = '';
-
+            if (docSnap.exists()) {
+                // RECORD EXISTS
+                const existingStatus = docSnap.data().status;
+                if (existingStatus === newStatus) {
+                    Utils.showAlert(`Student is already marked as '${existingStatus}'. No change needed.`, 'info');
+                    return;
+                }
+                
+                // Ask for confirmation to UPDATE
+                if (confirm(`A record already exists with status '${existingStatus}'. Do you want to change it to '${newStatus}'?`)) {
+                    await updateDoc(attendanceRef, {
+                        status: newStatus,
+                        timestamp: new Date(),
+                        markedBy: 'admin'
+                    });
+                    Utils.showAlert('Attendance record updated successfully!', 'success');
+                }
+            } else {
+                // NO RECORD EXISTS - CREATE NEW ONE
+                await setDoc(attendanceRef, {
+                    status: newStatus,
+                    subject: className,
+                    timestamp: new Date(),
+                    markedBy: 'admin'
+                });
+                Utils.showAlert(`Attendance marked successfully for ${rollNumber}!`, 'success');
+            }
+             document.getElementById('manualRollNumber').value = '';
         } catch (error) {
-            console.error("FIREBASE WRITE FAILED:", error);
-            Utils.showAlert(`Failed to save attendance. Check console for errors.`, 'danger');
+            console.error("Error marking attendance:", error);
+            Utils.showAlert('Failed to save attendance. Check console for details.', 'danger');
         }
     }
     
@@ -440,6 +452,7 @@ export class AdminDashboard {
         }
 
         let tableHTML = `
+        let tableHTML = `
             <h4 class="card-title mt-4">${title}</h4>
             <div class="table-responsive">
                 <table class="table">
@@ -455,7 +468,7 @@ export class AdminDashboard {
         reportDisplay.innerHTML = tableHTML;
     }
 
-    exportStudentData() {
+     exportStudentData() {
         if (this.registeredStudents.length === 0) {
             Utils.showAlert('No student data to export.', 'warning');
             return;
@@ -487,7 +500,7 @@ export class AdminDashboard {
         link.click();
         document.body.removeChild(link);
         Utils.showAlert('Student data exported!', 'success');
-    }
+}
 
 
     async bulkLogout() {
@@ -506,4 +519,4 @@ export class AdminDashboard {
         await this.bulkLogout();
       }
     }
-}
+        }
