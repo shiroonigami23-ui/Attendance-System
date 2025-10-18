@@ -60,7 +60,7 @@ class AttendanceSystem {
             if (user) this.showUI(user);
         });
 
-        document.getElementById('adminAuthForm').addEventListener('submit', (e) => {
+        document.getElementById('adminAuthForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const username = document.getElementById('adminUsername').value;
             const password = document.getElementById('adminPassword').value;
@@ -132,7 +132,8 @@ window.refreshAdminData = () => window.app.adminDashboard.loadRegisteredStudents
 window.markManualAttendance = () => window.app.adminDashboard.markManualAttendance();
 window.cancelClass = () => window.app.adminDashboard.cancelClass();
 window.generateClassReport = () => window.app.adminDashboard.generateClassReport();
-// --- NEW: Hook up the Export CSV function ---
+// --- NEW: Connecting the export button ---
+window.exportReport = () => window.app.adminDashboard.exportCurrentReport();
 window.exportStudentData = () => window.app.adminDashboard.exportStudentData();
 window.bulkLogout = () => window.app.adminDashboard.bulkLogout();
 window.clearDeviceData = () => window.app.adminDashboard.clearAllDeviceData();
