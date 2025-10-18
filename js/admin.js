@@ -403,6 +403,43 @@ export class AdminDashboard {
         reportDisplay.innerHTML = tableHTML;
     }
 
+    // --- NEW: Exports the current student list to a CSV file ---
+    exportStudentData() {
+        if (this.registeredStudents.length === 0) {
+            Utils.showAlert('No student data to export.', 'warning');
+            return;
+        }
+
+        const headers = ['RollNumber', 'Username', 'Section', 'DeviceID', 'LastLogin'];
+        
+        // Use a Set to avoid duplicate rows if a student has multiple device entries somehow
+        const studentSet = new Set(this.registeredStudents.map(s => JSON.stringify(s)));
+        const uniqueStudents = Array.from(studentSet).map(s => JSON.parse(s));
+
+        const rows = uniqueStudents.map(student => [
+            student.rollNumber,
+            `"${student.username.replace(/"/g, '""')}"`, // Handle names with quotes
+            student.section,
+            student.deviceId || 'N/A',
+            student.lastLogin ? new Date(student.lastLogin).toLocaleString() : 'N/A'
+        ]);
+
+        const csvContent = "data:text/csv;charset=utf-8," 
+            + headers.join(',') + '\n' 
+            + rows.map(e => e.join(',')).join('\n');
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `student_data_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link); // Required for Firefox
+
+        link.click();
+        document.body.removeChild(link);
+        Utils.showAlert('Student data exported!', 'success');
+    }
+
+
     async bulkLogout() {
         if (confirm("DANGER: This will de-register ALL devices, forcing every student to log in again. Are you sure?")) {
             Utils.showAlert('De-registering all devices... This may take a moment.', 'info');
@@ -419,4 +456,4 @@ export class AdminDashboard {
         await this.bulkLogout();
       }
     }
-}
+          }
