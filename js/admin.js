@@ -90,17 +90,18 @@ export class AdminDashboard {
         const timetableA = this.configManager.getTimetable('A');
         const timetableB = this.configManager.getTimetable('B');
         
-        // Map to store unique subjects: Key = Subject Code, Value = Full Name/Slot Name
+        // Map to store unique subjects: Key = Subject Code (e.g., CS501), Value = Full Name
         const consolidatedSubjects = new Map();
 
-        // 1. Add all official subjects (Theory and Lab names) from the config
+        // 1. PRIORITIZE: Add all official subjects with their full descriptive names.
+        // This is the cleanest list and should be the default for Admin manual marking.
         subjectsFromConfig.forEach(subject => {
             const fullName = `${subject.code} - ${subject.name}`;
             consolidatedSubjects.set(subject.code, fullName);
         });
 
-        // 2. Scan the timetable to capture specific Lab/Slot names
-        // This ensures complex names like "CS 502LAB B1+B2" are included.
+        // 2. SCAN TIMETABLE: Use complex timetable names ONLY if the subject code is not in the config.
+        // (This is primarily a safety check, but also captures names like 'CS 505 B1+B2 NETLAB' if necessary)
         const processTimetable = (timetable) => {
             for (const daySchedule of Object.values(timetable)) {
                 for (const slot of Object.values(daySchedule)) {
@@ -108,10 +109,10 @@ export class AdminDashboard {
                     
                     const subjectCode = slot.subject.split(' ')[0];
                     
-                    // If the slot name is NOT the standard CS50X code (i.e., it's a lab), 
-                    // and we haven't already stored this exact slot name, add it.
-                    if (slot.subject !== subjectCode && !consolidatedSubjects.has(slot.subject)) {
-                        // Store the complex name using the complex name as the key
+                    // If the code is NOT already in the map (highly unlikely with your config)
+                    // OR if the slot name itself is more complex than the simple code (e.g., "CS502LAB B1+B2")
+                    // AND it doesn't already have a full descriptive name, add it.
+                    if (slot.subject !== subjectCode && !consolidatedSubjects.has(subjectCode)) {
                         consolidatedSubjects.set(slot.subject, slot.subject);
                     }
                 }
@@ -121,7 +122,7 @@ export class AdminDashboard {
         processTimetable(timetableA);
         processTimetable(timetableB);
         
-        // Prepare the array for sorting
+        // 3. FINALIZE LIST: Sort the resulting values (full names).
         const selectorOptions = Array.from(consolidatedSubjects.values()).sort();
 
         const selectors = [
@@ -130,7 +131,7 @@ export class AdminDashboard {
         ];
 
         selectors.forEach(selector => {
-            if (selector) selector.innerHTML = '<option value="">-- Select Class --</option>'; // Add default option
+            if (selector) selector.innerHTML = '<option value="">-- Select Class --</option>';
         });
 
         if (selectorOptions.length === 0) {
@@ -141,10 +142,10 @@ export class AdminDashboard {
             return;
         }
 
-        // Now, populate the selectors with the unique, sorted list
+        // Now, populate the selectors with the final, clean, sorted list
         selectorOptions.forEach(subjectName => {
             const option = document.createElement('option');
-            // The value must be the display name for the manualAttendance function to extract the code
+            // The value MUST be the full display name for the manualAttendance function to extract the code
             option.value = subjectName;
             option.textContent = subjectName;
             
@@ -153,10 +154,8 @@ export class AdminDashboard {
             });
         });
     }
-
     
     
-
     async loadRegisteredStudents() {
         console.log("Admin: Fetching registered students...");
         const usersSnap = await getDocs(collection(db, "users"));
