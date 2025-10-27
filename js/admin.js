@@ -281,7 +281,7 @@ export class AdminDashboard {
         }
     }
 
-    async markManualAttendance() {
+     async markManualAttendance() {
         const rollNumber = document.getElementById('manualRollNumber').value;
         const newStatus = document.getElementById('attendanceStatus').value;
         
@@ -327,6 +327,8 @@ export class AdminDashboard {
 
         const attendanceRef = doc(db, "attendance", rollNumber, "records", dateStr, "subjects", subjectCode);
         
+        const parentRecordRef = doc(db, "attendance", rollNumber, "records", dateStr); 
+        
         try {
             const docSnap = await getDoc(attendanceRef);
             if (docSnap.exists()) {
@@ -341,17 +343,23 @@ export class AdminDashboard {
                         status: newStatus, 
                         markedBy: 'admin', 
                         timestamp: new Date(),
-                        subject: fullClassNameFromSelector // Store the full name for display
+                        subject: fullClassNameFromSelector 
                     });
+                    
+                    await setDoc(parentRecordRef, { updated: new Date() }, { merge: true });
+
                     Utils.showAlert('Attendance record updated successfully!', 'success');
                 }
             } else {
                 await setDoc(attendanceRef, { 
                     status: newStatus, 
-                    subject: fullClassNameFromSelector, // Store the full name for display
+                    subject: fullClassNameFromSelector,
                     markedBy: 'admin', 
                     timestamp: new Date() 
                 });
+                
+                await setDoc(parentRecordRef, { created: new Date() }, { merge: true });
+
                 Utils.showAlert(`Attendance marked successfully for ${rollNumber}!`, 'success');
             }
              document.getElementById('manualRollNumber').value = '';
@@ -360,6 +368,7 @@ export class AdminDashboard {
             Utils.showAlert('Failed to save attendance. Check console for details.', 'danger');
         }
     }
+    
 
     async cancelClass() {
         const dateStr = document.getElementById('cancelDate').value; 
@@ -539,11 +548,15 @@ export class AdminDashboard {
                     const docSnap = await getDoc(attendanceRef);
                     if (!docSnap.exists()) {
                         await setDoc(attendanceRef, { status: 'absent', subject: className, markedBy: 'system', timestamp: new Date() });
+                        const parentRecordRef = doc(db, "attendance", student.rollNumber, "records", dateStr);
+                        await setDoc(parentRecordRef, { synced: new Date() }, { merge: true });
+                    }
                     }
                 }
             }
         }
     }
+
 
     async generateClassReport() {
         const reportType = document.getElementById('reportType').value;
