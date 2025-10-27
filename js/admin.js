@@ -555,7 +555,7 @@ export class AdminDashboard {
                 }
             }
         }
-    }
+
 
 
     async generateClassReport() {
