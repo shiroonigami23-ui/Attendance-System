@@ -109,6 +109,7 @@ window.changeCalendarMonth = (direction) => window.app.studentDashboard.changeMo
 window.showDayDetails = (dateStr) => window.app.studentDashboard.showAttendanceForDay(dateStr);
 window.switchSection = (sectionId) => window.app.studentDashboard.switchSection(sectionId);
 window.scanQR = () => window.app.studentDashboard.markAttendance(); 
+window.refreshStudentData = () => window.app.studentDashboard.refreshData();
 
 // Admin Functions
 window.adminLogout = () => {
