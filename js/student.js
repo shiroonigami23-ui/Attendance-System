@@ -187,7 +187,7 @@ export class StudentDashboard {
 
             if(dailyRecord.subjects && Object.keys(dailyRecord.subjects).length > 0) {
                 hasRecords = true;
-                for(const [subject, record] of Object.entries(dailyRecord.subjects)){
+                for(const [key, record] of Object.entries(dailyRecord.subjects)){
                     let statusClass = 'text-muted';
                     let statusText = record.status.toUpperCase();
 
@@ -431,7 +431,7 @@ export class StudentDashboard {
         
         const className = `${currentClassInfo.subject}`;
         const dateStr = now.toISOString().split('T')[0];
-        const attendanceRef = doc(db, "attendance", this.currentUser.rollNumber, "records", dateStr, "subjects", dbKey);
+        const attendanceRef = doc(db, "attendance", this.currentUser.rollNumber, "records", dateStr, "subjects", subjectCode);
 
         try {
             const docSnap = await getDoc(attendanceRef);
