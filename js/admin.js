@@ -90,39 +90,39 @@ export class AdminDashboard {
         const timetableA = this.configManager.getTimetable('A');
         const timetableB = this.configManager.getTimetable('B');
         
-        const uniqueTimetableSubjects = new Set();
+        // Map to store unique subjects: Key = Subject Code, Value = Full Name/Slot Name
+        const consolidatedSubjects = new Map();
+
+        // 1. Add all official subjects (Theory and Lab names) from the config
+        subjectsFromConfig.forEach(subject => {
+            const fullName = `${subject.code} - ${subject.name}`;
+            consolidatedSubjects.set(subject.code, fullName);
+        });
+
+        // 2. Scan the timetable to capture specific Lab/Slot names
+        // This ensures complex names like "CS 502LAB B1+B2" are included.
+        const processTimetable = (timetable) => {
+            for (const daySchedule of Object.values(timetable)) {
+                for (const slot of Object.values(daySchedule)) {
+                    if (slot.type.toLowerCase() === 'break' || slot.subject.toLowerCase().includes('study')) continue;
+                    
+                    const subjectCode = slot.subject.split(' ')[0];
+                    
+                    // If the slot name is NOT the standard CS50X code (i.e., it's a lab), 
+                    // and we haven't already stored this exact slot name, add it.
+                    if (slot.subject !== subjectCode && !consolidatedSubjects.has(slot.subject)) {
+                        // Store the complex name using the complex name as the key
+                        consolidatedSubjects.set(slot.subject, slot.subject);
+                    }
+                }
+            }
+        };
+
+        processTimetable(timetableA);
+        processTimetable(timetableB);
         
-        // Add all subjects from the timetable (includes labs)
-        for (const daySchedule of Object.values(timetableA)) {
-            for (const slot of Object.values(daySchedule)) {
-                if (slot.type.toLowerCase() !== 'break' && !slot.subject.toLowerCase().includes('study')) {
-                    // Use the format: CS501 - Theory of Computation (or CS 506 LAB B1+B2)
-                    const subjectCode = slot.subject.split(' ')[0];
-                    const officialSubject = subjectsFromConfig.find(s => s.code === subjectCode);
-                    
-                    if (officialSubject && officialSubject.code === slot.subject) {
-                        uniqueTimetableSubjects.add(`${officialSubject.code} - ${officialSubject.name}`);
-                    } else {
-                        uniqueTimetableSubjects.add(slot.subject);
-                    }
-                }
-            }
-        }
-        // Repeat for Section B to catch any unique classes
-         for (const daySchedule of Object.values(timetableB)) {
-            for (const slot of Object.values(daySchedule)) {
-                if (slot.type.toLowerCase() !== 'break' && !slot.subject.toLowerCase().includes('study')) {
-                    const subjectCode = slot.subject.split(' ')[0];
-                    const officialSubject = subjectsFromConfig.find(s => s.code === subjectCode);
-                    
-                    if (officialSubject && officialSubject.code === slot.subject) {
-                        uniqueTimetableSubjects.add(`${officialSubject.code} - ${officialSubject.name}`);
-                    } else {
-                        uniqueTimetableSubjects.add(slot.subject);
-                    }
-                }
-            }
-        }
+        // Prepare the array for sorting
+        const selectorOptions = Array.from(consolidatedSubjects.values()).sort();
 
         const selectors = [
             document.getElementById('manualClassSelector'),
@@ -130,10 +130,10 @@ export class AdminDashboard {
         ];
 
         selectors.forEach(selector => {
-            if (selector) selector.innerHTML = '<option value="">-- Select Class --</option>';
+            if (selector) selector.innerHTML = '<option value="">-- Select Class --</option>'; // Add default option
         });
 
-        if (uniqueTimetableSubjects.size === 0) {
+        if (selectorOptions.length === 0) {
             const defaultOption = '<option value="">No subjects found</option>';
             selectors.forEach(selector => {
                 if (selector) selector.innerHTML = defaultOption;
@@ -141,9 +141,10 @@ export class AdminDashboard {
             return;
         }
 
-        // Now, populate the selectors with the unique list
-        Array.from(uniqueTimetableSubjects).sort().forEach(subjectName => {
+        // Now, populate the selectors with the unique, sorted list
+        selectorOptions.forEach(subjectName => {
             const option = document.createElement('option');
+            // The value must be the display name for the manualAttendance function to extract the code
             option.value = subjectName;
             option.textContent = subjectName;
             
@@ -152,6 +153,7 @@ export class AdminDashboard {
             });
         });
     }
+
     
     
 
