@@ -236,21 +236,32 @@ export class AdminDashboard {
                     const daySchedule = sectionTimetable ? sectionTimetable[dayName] : null;
     
                     if (daySchedule) {
-                        const dailyAttendance = attendanceMap.get(dateStr);
+                        const dailyRecords = attendanceMap.get(dateStr);
+                        
                         for (const slot of Object.values(daySchedule)) {
                             // Skip breaks and study periods
                             if (slot.type.toLowerCase() === 'break' || slot.subject.toLowerCase().includes('study')) continue;
                             
                             totalScheduledClasses++;
                             
-                            // --- CRITICAL FIX: Determine the standardized DB key ---
-                            // The key is the first word of the subject name (e.g., 'CS501')
-                            const attendanceKey = slot.subject.split(' ')[0]; 
-    
-                            // --- Use the standardized attendanceKey for lookup ---
-                            const record = dailyAttendance ? dailyAttendance.get(attendanceKey) : null;
-    
-                            if (record && (record.status === 'present' || record.status === 'late')) {
+                            // The subject code is what's common: e.g., 'CS502'
+                            const codeToMatch = slot.subject.split(' ')[0]; 
+                            
+                            let attended = false;
+
+                            if (dailyRecords) {
+                                // --- CRITICAL FIX: Iterate through all saved records for the day ---
+                                for (const record of dailyRecords.values()) {
+                                    // Check if the saved record (record.subject) contains the code for this slot
+                                    if (record.subject.includes(codeToMatch) && 
+                                        (record.status === 'present' || record.status === 'late')) {
+                                        attended = true;
+                                        break; 
+                                    }
+                                }
+                            }
+                            
+                            if (attended) {
                                 totalAttendedClasses++;
                             }
                         }
@@ -274,6 +285,8 @@ export class AdminDashboard {
             modalContent.innerHTML = `<p class="text-danger">Could not calculate attendance. Please try again.</p>`;
         }
     }
+    
+                            
     
     updateAdminStats() {
         document.getElementById('totalStudents').textContent = this.registeredStudents.length;
