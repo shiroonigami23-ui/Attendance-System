@@ -1,3 +1,5 @@
+// js/student.js
+
 import { db } from './firebase-config.js';
 import { doc, setDoc, getDoc, collection, getDocs, orderBy, query } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 import { Utils } from './utils.js';
@@ -15,16 +17,6 @@ export class StudentDashboard {
         this.notifiedCancellations = new Set();
     }
 
-    async refreshData() {
-        Utils.showAlert('Refreshing attendance data...', 'info', 2000);
-        await this.fetchAttendanceHistory();
-        this.updateAttendanceStats();
-        this.renderAttendanceLog();
-        this.renderSubjectAttendance();
-        this.renderAttendanceCalendar();
-        Utils.showAlert('Data refreshed!', 'success', 2000);
-    }
-    
     async init(userData) {
         this.currentUser = userData;
         this.currentSection = userData.section;
@@ -45,6 +37,17 @@ export class StudentDashboard {
         setInterval(() => this.checkForCancellations(), 60000); // Check every minute
         this.checkAttendanceWindow();
         this.checkForCancellations();
+    }
+
+    // --- NEW: Public method to refresh all student data ---
+    async refreshData() {
+        Utils.showAlert('Refreshing attendance data...', 'info', 2000);
+        await this.fetchAttendanceHistory();
+        this.updateAttendanceStats();
+        this.renderAttendanceLog();
+        this.renderSubjectAttendance();
+        this.renderAttendanceCalendar();
+        Utils.showAlert('Data refreshed!', 'success', 2000);
     }
 
     renderHeader() {
@@ -187,6 +190,8 @@ export class StudentDashboard {
 
             if(dailyRecord.subjects && Object.keys(dailyRecord.subjects).length > 0) {
                 hasRecords = true;
+                // 'key' is the Firestore Document ID (the subjectCode, e.g., 'CS501')
+                // 'record' is the document data {status, subject: "Full Subject Name", ...}
                 for(const [key, record] of Object.entries(dailyRecord.subjects)){
                     let statusClass = 'text-muted';
                     let statusText = record.status.toUpperCase();
@@ -197,7 +202,7 @@ export class StudentDashboard {
                     const formattedTime = record.timestamp ? new Date(record.timestamp.toDate()).toLocaleTimeString() : '-';
                     tableBody.innerHTML += `<tr>
                         <td>${formattedDate}</td>
-                        <td><span class="${statusClass}" style="font-weight: bold;">${statusText}</span> in ${subject}</td>
+                        <td><span class="${statusClass}" style="font-weight: bold;">${statusText}</span> in ${record.subject}</td>
                         <td>${formattedTime}</td>
                     </tr>`;
                 }
@@ -220,11 +225,28 @@ export class StudentDashboard {
 
         Object.values(this.attendanceHistory).forEach(dailyRecord => {
             if (dailyRecord.subjects) {
-                for (const [subject, record] of Object.entries(dailyRecord.subjects)) {
-                    if (subjectStats[subject] && record.status !== 'cancelled') {
-                        subjectStats[subject].total++;
+                // Here, 'recordKey' is the subject code (e.g., 'CS501')
+                for (const [recordKey, record] of Object.entries(dailyRecord.subjects)) {
+                    // CRITICAL CHANGE: Use record.subject (full name) to link to a subject code
+                    const fullSubjectName = record.subject; 
+                    
+                    // Find the base subject from the config using the code inside the full name
+                    const matchingSubject = subjects.find(sub => fullSubjectName.includes(sub.code));
+                    const statKey = matchingSubject ? `${matchingSubject.code} - ${matchingSubject.name}` : fullSubjectName;
+                    
+                    if (subjectStats[statKey] && record.status !== 'cancelled') {
+                        subjectStats[statKey].total++;
                         if (record.status === 'present' || record.status === 'late') {
-                            subjectStats[subject].attended++;
+                            subjectStats[statKey].attended++;
+                        }
+                    } else if (!subjectStats[statKey]) {
+                        // Initialize if it's a lab name that didn't strictly match the config subject key
+                         subjectStats[statKey] = { attended: 0, total: 0 };
+                         if (record.status !== 'cancelled') {
+                            subjectStats[statKey].total++;
+                            if (record.status === 'present' || record.status === 'late') {
+                                subjectStats[statKey].attended++;
+                            }
                         }
                     }
                 }
@@ -426,12 +448,16 @@ export class StudentDashboard {
             Utils.showAlert('Could not determine the current class. Please try again within the window.', 'danger');
             return;
         }
-
-        const dbKey = currentClassInfo.subject.split(' ')[0];
         
-        const className = `${currentClassInfo.subject}`;
+        // --- CRITICAL FIX: Extract the Subject Code for a standardized database key ---
+        // Assumes subject code is the first word/token in the subject string (e.g., 'CS501' from 'CS501' or 'CS 506 LAB B1+B2')
+        const subjectCode = currentClassInfo.subject.split(' ')[0]; 
+        
+        const className = `${currentClassInfo.subject}`; // Full class name for storage
         const dateStr = now.toISOString().split('T')[0];
-        const attendanceRef = doc(db, "attendance", this.currentUser.rollNumber, "records", dateStr, "subjects", subjectCode);
+        
+        // --- Use the standardized subjectCode as the document ID ---
+        const attendanceRef = doc(db, "attendance", this.currentUser.rollNumber, "records", dateStr, "subjects", subjectCode); 
 
         try {
             const docSnap = await getDoc(attendanceRef);
@@ -442,7 +468,7 @@ export class StudentDashboard {
 
             await setDoc(attendanceRef, {
                 status: 'present',
-                subject: className,
+                subject: className, // Store the full timetable name for display/reports
                 timestamp: new Date(),
                 markedBy: 'student'
             });
