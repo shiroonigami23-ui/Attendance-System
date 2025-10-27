@@ -299,6 +299,12 @@ export class AdminDashboard {
             return;
         }
 
+          // --- NEW: Extract the Subject Code from the selector value ---
+        const classNameParts = className.split(' - ');
+        const subjectCode = classNameParts[0]; // e.g., "CS502"
+        
+        // Find the full class name as it appears in the timetable for verification
+        
         const student = this.registeredStudents.find(s => s.rollNumber === rollNumber);
         if (!student) {
             Utils.showAlert(`Student with roll number ${rollNumber} not found.`, 'danger');
@@ -321,7 +327,7 @@ export class AdminDashboard {
             return;
         }
 
-        const attendanceRef = doc(db, "attendance", rollNumber, "records", dateStr, "subjects", className);
+        const attendanceRef = doc(db, "attendance", rollNumber, "records", dateStr, "subjects", subjectCode  );
         
         try {
             const docSnap = await getDoc(attendanceRef);
