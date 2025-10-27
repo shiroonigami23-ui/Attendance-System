@@ -426,10 +426,12 @@ export class StudentDashboard {
             Utils.showAlert('Could not determine the current class. Please try again within the window.', 'danger');
             return;
         }
+
+        const dbKey = currentClassInfo.subject.split(' ')[0];
         
         const className = `${currentClassInfo.subject}`;
         const dateStr = now.toISOString().split('T')[0];
-        const attendanceRef = doc(db, "attendance", this.currentUser.rollNumber, "records", dateStr, "subjects", className);
+        const attendanceRef = doc(db, "attendance", this.currentUser.rollNumber, "records", dateStr, "subjects", dbKey);
 
         try {
             const docSnap = await getDoc(attendanceRef);
