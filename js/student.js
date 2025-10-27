@@ -15,6 +15,16 @@ export class StudentDashboard {
         this.notifiedCancellations = new Set();
     }
 
+    async refreshData() {
+        Utils.showAlert('Refreshing attendance data...', 'info', 2000);
+        await this.fetchAttendanceHistory();
+        this.updateAttendanceStats();
+        this.renderAttendanceLog();
+        this.renderSubjectAttendance();
+        this.renderAttendanceCalendar();
+        Utils.showAlert('Data refreshed!', 'success', 2000);
+    }
+    
     async init(userData) {
         this.currentUser = userData;
         this.currentSection = userData.section;
