@@ -281,18 +281,18 @@ export class AdminDashboard {
         }
     }
 
-     async markManualAttendance() {
+    async markManualAttendance() {
         const rollNumber = document.getElementById('manualRollNumber').value;
         const newStatus = document.getElementById('attendanceStatus').value;
         
         const fullClassNameFromSelector = document.getElementById('manualClassSelector').value;
-        
         const dateInput = document.getElementById('manualAttendanceDate');
         const dateStr = dateInput.value;
 
-        const selectedDate = new Date(dateStr + 'T23:59:59');
-        if (selectedDate > new Date()) {
-            Utils.showAlert("You cannot mark attendance for a future date.", 'danger');
+        // --- VALIDATION 1: Check against future date (tomorrow or later) ---
+        const todayStr = new Date().toISOString().split('T')[0];
+        if (dateStr > todayStr) { 
+            Utils.showAlert("You cannot mark attendance for a future date (wait for class to happen).", 'danger');
             return;
         }
 
@@ -319,14 +319,42 @@ export class AdminDashboard {
         }
         
         const classCode = fullClassNameFromSelector.split(' - ')[0].replace(/\s/g, '');
-        const isClassScheduled = Object.values(daySchedule).some(slot => slot.subject.replace(/\s/g, '').includes(classCode));
-        if (!isClassScheduled) {
+        
+        // Find all slots for this subject today
+        const subjectSlots = Object.entries(daySchedule)
+            .filter(([timeSlot, slotInfo]) => slotInfo.subject.replace(/\s/g, '').includes(classCode));
+        
+        if (subjectSlots.length === 0) {
             Utils.showAlert(`The class "${fullClassNameFromSelector}" is not scheduled on ${dayOfWeek} for Section ${student.section}.`, 'warning');
             return;
         }
 
-        const attendanceRef = doc(db, "attendance", rollNumber, "records", dateStr, "subjects", subjectCode);
+        // --- VALIDATION 2: Check against current time (Only for TODAY) ---
+        if (dateStr === todayStr) {
+            
+            // 1. Find the LATEST end time among all slots for this class today.
+            const latestEndTimeStr = subjectSlots
+                .map(([timeSlot, slotInfo]) => timeSlot.split('-')[1])
+                .sort() // Simple string sort works for HH:MM format
+                .pop();
+            
+            if (latestEndTimeStr) {
+                const [endHour, endMinute] = latestEndTimeStr.split(':').map(Number);
+                
+                // 2. Create a Date object for the class's scheduled end time today.
+                const classEndDateTime = new Date();
+                classEndDateTime.setHours(endHour, endMinute, 0, 0);
+
+                // 3. Check if the class is still in the future.
+                if (new Date() < classEndDateTime) {
+                    Utils.showAlert(`Cannot mark attendance. The last scheduled slot for this class ends at ${latestEndTimeStr}.`, 'danger');
+                    return;
+                }
+            }
+        }
         
+        // All validation passed. Proceed with DB operations.
+        const attendanceRef = doc(db, "attendance", rollNumber, "records", dateStr, "subjects", subjectCode);
         const parentRecordRef = doc(db, "attendance", rollNumber, "records", dateStr); 
         
         try {
@@ -368,6 +396,7 @@ export class AdminDashboard {
             Utils.showAlert('Failed to save attendance. Check console for details.', 'danger');
         }
     }
+                    
     
 
     async cancelClass() {
