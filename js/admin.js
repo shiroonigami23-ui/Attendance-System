@@ -85,24 +85,26 @@ export class AdminDashboard {
     }
 
 
+    // js/admin.js
+
     populateClassSelectors() {
         const subjectsFromConfig = this.configManager.getSubjects();
         const timetableA = this.configManager.getTimetable('A');
         const timetableB = this.configManager.getTimetable('B');
         
-        // Map to store unique subjects: Key = Full Name (for final deduplication)
+        // Map to store unique subjects: Key = Subject Code (e.g., CS501), Value = Full Name
         const consolidatedSubjects = new Map();
 
-        // 1. HIGH PRIORITY: Use the official subjects with their full descriptive names.
-        // This handles all Theory/Main classes (e.g., "CS501 - Theory of Computation").
+        // 1. HIGH PRIORITY: Use the official descriptive name for every subject code.
+        // This eliminates short codes (like just 'CS501') and complex lab names later.
         subjectsFromConfig.forEach(subject => {
             const fullName = `${subject.code} - ${subject.name}`;
-            consolidatedSubjects.set(fullName, true); // Use fullName as key for uniqueness
+            // Map key is the clean code, value is the full descriptive name.
+            consolidatedSubjects.set(subject.code, fullName);
         });
 
-        // 2. EXPLICITLY ADD LAB SESSIONS: Scan the timetable to capture necessary complex Lab names.
-        // This logic ensures we pick up slots like 'CS 502 LAB B1+B2' that the Admin needs to select.
-        const complexLabNames = new Set();
+        // 2. SCAN TIMETABLE: Add complex Lab names ONLY if they have a unique subject code
+        // (This step is primarily for safety, but ensures we don't accidentally miss a class)
         const processTimetable = (timetable) => {
             for (const daySchedule of Object.values(timetable)) {
                 for (const slot of Object.values(daySchedule)) {
@@ -110,12 +112,12 @@ export class AdminDashboard {
                     
                     const subjectCode = slot.subject.split(' ')[0];
                     
-                    // Check if the slot name is NOT one of the 8 official codes AND is NOT one of the 8 official full names.
-                    const isComplexLab = slot.subject.length > subjectCode.length + 1 && !consolidatedSubjects.has(slot.subject);
-                    
-                    // Only add complex names if they relate to an existing subject code
-                    if (isComplexLab) {
-                        complexLabNames.add(slot.subject);
+                    // If the subject code is not already in our map (very rare), or if the subject
+                    // name is a complex lab name that is BETTER than the current name stored, update it.
+                    // Since we prioritized official names, we skip this step unless a new code is found.
+                    if (!consolidatedSubjects.has(subjectCode) && slot.subject !== subjectCode) {
+                        // This handles the extremely rare case where a timetable slot is NOT in the subject list.
+                        consolidatedSubjects.set(subjectCode, slot.subject);
                     }
                 }
             }
@@ -124,17 +126,9 @@ export class AdminDashboard {
         processTimetable(timetableA);
         processTimetable(timetableB);
         
-        // 3. MERGE LABS INTO THE FINAL LIST
-        complexLabNames.forEach(labName => {
-             // Use the complex name itself as the unique key.
-            consolidatedSubjects.set(labName, true); 
-        });
+        // 3. FINALIZE LIST: The map values now contain exactly one clean name per subject code.
+        const selectorOptions = Array.from(consolidatedSubjects.values()).sort();
 
-
-        // 4. FINALIZE LIST: Get the unique names and sort them.
-        const selectorOptions = Array.from(consolidatedSubjects.keys()).sort();
-        
-        // 5. Populate Selectors (rest of the logic)
         const selectors = [
             document.getElementById('manualClassSelector'),
             document.getElementById('cancelClassSelector')
@@ -152,8 +146,10 @@ export class AdminDashboard {
             return;
         }
 
+        // Now, populate the selectors with the final, clean, sorted list
         selectorOptions.forEach(subjectName => {
             const option = document.createElement('option');
+            // The value is the full display name, which the manualAttendance function will use to extract the code.
             option.value = subjectName;
             option.textContent = subjectName;
             
@@ -162,8 +158,6 @@ export class AdminDashboard {
             });
         });
     }
-    
-            
             
     async loadRegisteredStudents() {
         console.log("Admin: Fetching registered students...");
