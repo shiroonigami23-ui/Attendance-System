@@ -214,6 +214,8 @@ export class AdminDashboard {
                 const subjectsMap = new Map();
                 const subjectsCol = collection(db, "attendance", rollNumber, "records", dateDoc.id, "subjects");
                 const subjectSnapshot = await getDocs(subjectsCol);
+                
+                // IMPORTANT: SubjectsMap stores data keyed by the standardized subject code (e.g., 'CS501')
                 subjectSnapshot.forEach(subjectDoc => {
                     subjectsMap.set(subjectDoc.id, subjectDoc.data());
                 });
@@ -237,10 +239,17 @@ export class AdminDashboard {
                     if (daySchedule) {
                         const dailyAttendance = attendanceMap.get(dateStr);
                         for (const slot of Object.values(daySchedule)) {
+                            // Skip breaks and study periods
                             if (slot.type.toLowerCase() === 'break' || slot.subject.toLowerCase().includes('study')) continue;
                             
                             totalScheduledClasses++;
-                            const record = dailyAttendance ? dailyAttendance.get(slot.subject) : null;
+                            
+                            // --- CRITICAL FIX: Determine the standardized DB key ---
+                            // The key is the first word of the subject name (e.g., 'CS501')
+                            const attendanceKey = slot.subject.split(' ')[0]; 
+    
+                            // --- Use the standardized attendanceKey for lookup ---
+                            const record = dailyAttendance ? dailyAttendance.get(attendanceKey) : null;
     
                             if (record && (record.status === 'present' || record.status === 'late')) {
                                 totalAttendedClasses++;
