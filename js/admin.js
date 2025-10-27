@@ -610,6 +610,13 @@ export class AdminDashboard {
 
     async synchronizeAttendanceForDate(dateStr) {
         const date = new Date(dateStr + 'T00:00:00');
+        const today = new Date();
+        const todayStr = today.toISOString().split('T')[0];
+
+        if (dateStr > todayStr) {
+            console.log(`Skipping synchronization for future date: ${dateStr}.`);
+            return;
+        }
         if (date < this.classStartDate) {
             console.log(`Skipping DB write for ${dateStr} (before official start date).`);
             return;
