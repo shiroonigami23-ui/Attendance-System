@@ -86,17 +86,54 @@ export class AdminDashboard {
 
 
     populateClassSelectors() {
-        const subjects = this.configManager.getSubjects();
+        const subjectsFromConfig = this.configManager.getSubjects();
+        const timetableA = this.configManager.getTimetable('A');
+        const timetableB = this.configManager.getTimetable('B');
+        
+        const uniqueTimetableSubjects = new Set();
+        
+        // Add all subjects from the timetable (includes labs)
+        for (const daySchedule of Object.values(timetableA)) {
+            for (const slot of Object.values(daySchedule)) {
+                if (slot.type.toLowerCase() !== 'break' && !slot.subject.toLowerCase().includes('study')) {
+                    // Use the format: CS501 - Theory of Computation (or CS 506 LAB B1+B2)
+                    const subjectCode = slot.subject.split(' ')[0];
+                    const officialSubject = subjectsFromConfig.find(s => s.code === subjectCode);
+                    
+                    if (officialSubject && officialSubject.code === slot.subject) {
+                        uniqueTimetableSubjects.add(`${officialSubject.code} - ${officialSubject.name}`);
+                    } else {
+                        uniqueTimetableSubjects.add(slot.subject);
+                    }
+                }
+            }
+        }
+        // Repeat for Section B to catch any unique classes
+         for (const daySchedule of Object.values(timetableB)) {
+            for (const slot of Object.values(daySchedule)) {
+                if (slot.type.toLowerCase() !== 'break' && !slot.subject.toLowerCase().includes('study')) {
+                    const subjectCode = slot.subject.split(' ')[0];
+                    const officialSubject = subjectsFromConfig.find(s => s.code === subjectCode);
+                    
+                    if (officialSubject && officialSubject.code === slot.subject) {
+                        uniqueTimetableSubjects.add(`${officialSubject.code} - ${officialSubject.name}`);
+                    } else {
+                        uniqueTimetableSubjects.add(slot.subject);
+                    }
+                }
+            }
+        }
+
         const selectors = [
             document.getElementById('manualClassSelector'),
             document.getElementById('cancelClassSelector')
         ];
 
         selectors.forEach(selector => {
-            if (selector) selector.innerHTML = '';
+            if (selector) selector.innerHTML = '<option value="">-- Select Class --</option>';
         });
 
-        if (subjects.length === 0) {
+        if (uniqueTimetableSubjects.size === 0) {
             const defaultOption = '<option value="">No subjects found</option>';
             selectors.forEach(selector => {
                 if (selector) selector.innerHTML = defaultOption;
@@ -104,8 +141,8 @@ export class AdminDashboard {
             return;
         }
 
-        subjects.forEach(subject => {
-            const subjectName = `${subject.code} - ${subject.name}`;
+        // Now, populate the selectors with the unique list
+        Array.from(uniqueTimetableSubjects).sort().forEach(subjectName => {
             const option = document.createElement('option');
             option.value = subjectName;
             option.textContent = subjectName;
@@ -115,6 +152,8 @@ export class AdminDashboard {
             });
         });
     }
+    
+    
 
     async loadRegisteredStudents() {
         console.log("Admin: Fetching registered students...");
