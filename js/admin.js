@@ -284,7 +284,9 @@ export class AdminDashboard {
     async markManualAttendance() {
         const rollNumber = document.getElementById('manualRollNumber').value;
         const newStatus = document.getElementById('attendanceStatus').value;
-        const className = document.getElementById('manualClassSelector').value;
+        
+        const fullClassNameFromSelector = document.getElementById('manualClassSelector').value;
+        
         const dateInput = document.getElementById('manualAttendanceDate');
         const dateStr = dateInput.value;
 
@@ -294,16 +296,12 @@ export class AdminDashboard {
             return;
         }
 
-        if (!rollNumber || !className || !dateStr) {
+        if (!rollNumber || !fullClassNameFromSelector || !dateStr) {
             Utils.showAlert('Please select a date, roll number, and class.', 'warning');
             return;
         }
 
-          // --- NEW: Extract the Subject Code from the selector value ---
-        const classNameParts = className.split(' - ');
-        const subjectCode = classNameParts[0]; // e.g., "CS502"
-        
-        // Find the full class name as it appears in the timetable for verification
+        const subjectCode = fullClassNameFromSelector.split(' - ')[0]; 
         
         const student = this.registeredStudents.find(s => s.rollNumber === rollNumber);
         if (!student) {
@@ -320,14 +318,14 @@ export class AdminDashboard {
             return;
         }
         
-        const classCode = className.split(' - ')[0].replace(/\s/g, '');
+        const classCode = fullClassNameFromSelector.split(' - ')[0].replace(/\s/g, '');
         const isClassScheduled = Object.values(daySchedule).some(slot => slot.subject.replace(/\s/g, '').includes(classCode));
         if (!isClassScheduled) {
-            Utils.showAlert(`The class "${className}" is not scheduled on ${dayOfWeek} for Section ${student.section}.`, 'warning');
+            Utils.showAlert(`The class "${fullClassNameFromSelector}" is not scheduled on ${dayOfWeek} for Section ${student.section}.`, 'warning');
             return;
         }
 
-        const attendanceRef = doc(db, "attendance", rollNumber, "records", dateStr, "subjects", subjectCode  );
+        const attendanceRef = doc(db, "attendance", rollNumber, "records", dateStr, "subjects", subjectCode);
         
         try {
             const docSnap = await getDoc(attendanceRef);
@@ -339,11 +337,21 @@ export class AdminDashboard {
                 }
                 
                 if (confirm(`A record by '${existingData.markedBy}' already exists with status '${existingData.status}'. Change to '${newStatus}'?`)) {
-                    await updateDoc(attendanceRef, { status: newStatus, markedBy: 'admin', timestamp: new Date() });
+                    await updateDoc(attendanceRef, { 
+                        status: newStatus, 
+                        markedBy: 'admin', 
+                        timestamp: new Date(),
+                        subject: fullClassNameFromSelector // Store the full name for display
+                    });
                     Utils.showAlert('Attendance record updated successfully!', 'success');
                 }
             } else {
-                await setDoc(attendanceRef, { status: newStatus, subject: className, markedBy: 'admin', timestamp: new Date() });
+                await setDoc(attendanceRef, { 
+                    status: newStatus, 
+                    subject: fullClassNameFromSelector, // Store the full name for display
+                    markedBy: 'admin', 
+                    timestamp: new Date() 
+                });
                 Utils.showAlert(`Attendance marked successfully for ${rollNumber}!`, 'success');
             }
              document.getElementById('manualRollNumber').value = '';
@@ -352,18 +360,19 @@ export class AdminDashboard {
             Utils.showAlert('Failed to save attendance. Check console for details.', 'danger');
         }
     }
-    
-    // --- REVAMPED: Smarter cancellation logic for a single class ---
+
     async cancelClass() {
         const dateStr = document.getElementById('cancelDate').value; 
-        const className = document.getElementById('cancelClassSelector').value;
+        const fullClassName = document.getElementById('cancelClassSelector').value; // e.g., "CS503 - Data Analytics"
         const sectionId = document.getElementById('cancelSectionSelector').value;
 
-        if (!dateStr || !className) {
+        if (!dateStr || !fullClassName) {
             Utils.showAlert('Please select a date and a class to cancel.', 'warning');
             return;
         }
 
+        const subjectCode = fullClassName.split(' - ')[0]; // Key for DB
+        
         const date = new Date(dateStr + 'T00:00:00');
         const dayOfWeek = date.getDay();
         if (dayOfWeek === 0 || dayOfWeek === 6 || holidays[dateStr]) {
@@ -378,18 +387,19 @@ export class AdminDashboard {
         for (const sec of sectionsToCheck) {
             const timetable = this.configManager.getTimetable(sec);
             const daySchedule = timetable ? timetable[dayName] : null;
-            if (daySchedule && Object.values(daySchedule).some(slot => slot.subject === className)) {
+            // Check if any slot for this section contains the subject code/name
+            if (daySchedule && Object.values(daySchedule).some(slot => slot.subject.includes(subjectCode))) {
                 isClassScheduled = true;
                 break;
             }
         }
 
         if (!isClassScheduled) {
-            Utils.showAlert(`The class "${className}" is not scheduled for Section(s) ${sectionsToCheck.join(', ')} on ${dayName}.`, 'danger');
+            Utils.showAlert(`The class "${fullClassName}" is not scheduled for Section(s) ${sectionsToCheck.join(', ')} on ${dayName}.`, 'danger');
             return;
         }
 
-        if (!confirm(`Are you sure you want to cancel "${className}" for Section(s) ${sectionsToCheck.join(', ')} on ${dateStr}?`)) return;
+        if (!confirm(`Are you sure you want to cancel "${fullClassName}" for Section(s) ${sectionsToCheck.join(', ')} on ${dateStr}?`)) return;
 
         const studentsToNotify = this.registeredStudents.filter(s => sectionsToCheck.includes(s.section));
         if (studentsToNotify.length === 0) {
@@ -400,20 +410,25 @@ export class AdminDashboard {
         Utils.showAlert('Processing cancellation...', 'info');
         
         const promises = studentsToNotify.map(student => {
-            const ref = doc(db, "attendance", student.rollNumber, "records", dateStr, "subjects", className);
-            return setDoc(ref, { status: 'cancelled', subject: className, markedBy: 'admin', timestamp: new Date() });
+            // Find the full class name as it appears in the student's timetable for the 'subject' field
+            const studentTimetable = this.configManager.getTimetable(student.section)?.[dayName];
+            const actualTimetableSubject = Object.values(studentTimetable || {}).find(slot => slot.subject.includes(subjectCode))?.subject || fullClassName;
+            
+            
+            const ref = doc(db, "attendance", student.rollNumber, "records", dateStr, "subjects", subjectCode); 
+            return setDoc(ref, { status: 'cancelled', subject: actualTimetableSubject, markedBy: 'admin', timestamp: new Date() });
         });
         await Promise.all(promises);
 
         const noticeRef = doc(db, "cancellations", dateStr);
         await setDoc(noticeRef, {
-            cancelledClasses: arrayUnion({ className, timestamp: new Date(), sections: sectionsToCheck })
+            cancelledClasses: arrayUnion({ className: fullClassName, timestamp: new Date(), sections: sectionsToCheck })
         }, { merge: true });
 
-        Utils.showAlert(`Successfully cancelled "${className}" for the selected sections.`, 'success');
+        Utils.showAlert(`Successfully cancelled "${fullClassName}" for the selected sections.`, 'success');
     }
 
-    // --- NEW: Function to cancel all classes for an entire day ---
+
     async cancelEntireDay() {
         const dateStr = document.getElementById('cancelDate').value;
         const sectionId = document.getElementById('cancelSectionSelector').value;
