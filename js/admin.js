@@ -14,15 +14,14 @@ export class AdminDashboard {
     }
 
     getNextMonday() {
-        const date = new Date();
-        const today = date.getDay();
-        const offset = today === 0 ? 1 : (8 - today) % 7;
-        const nextMonday = new Date(date);
-        nextMonday.setDate(date.getDate() + offset);
-        nextMonday.setHours(0, 0, 0, 0); 
-        console.log(`Official class start date set to: ${nextMonday.toDateString()}`);
-        return nextMonday;
+        const today = new Date();
+        
+        today.setHours(0, 0, 0, 0); 
+        
+        console.log(`Official class start date set to: ${today.toDateString()} (Current Day)`);
+        return today;
     }
+
 
     async init() {
         this.populateClassSelectors();
