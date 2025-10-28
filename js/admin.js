@@ -85,8 +85,6 @@ export class AdminDashboard {
     }
 
 
-    // js/admin.js
-
     populateClassSelectors() {
         const subjectsFromConfig = this.configManager.getSubjects();
         const timetableA = this.configManager.getTimetable('A');
@@ -95,21 +93,23 @@ export class AdminDashboard {
         // Map to store unique subjects: Key = Full Name
         const consolidatedSubjects = new Map();
 
-        // 1. HIGH PRIORITY: Add all official subjects with their full descriptive names.
-        // This handles all Theory/Main classes (e.g., "CS501 - Theory of Computation").
+        // 1. HIGH PRIORITY: Add all official subjects with their full descriptive names. (8 options)
         subjectsFromConfig.forEach(subject => {
             const fullName = `${subject.code} - ${subject.name}`;
             consolidatedSubjects.set(fullName, true);
         });
 
-        // 2. EXPLICITLY ADD COMPLEX LAB SESSIONS: Only add a Lab if it's a unique session type.
+        // 2. EXPLICITLY ADD UNIQUE LAB SESSIONS: Only add the complex lab names that represent 
+        // distinct marking opportunities, using the timetable as the source.
         const processTimetable = (timetable) => {
             for (const daySchedule of Object.values(timetable)) {
                 for (const slot of Object.values(daySchedule)) {
+                    // Only add if it's explicitly a Lab type
                     if (slot.type.toLowerCase() === 'lab') {
-                        // Labs often have the same name as the official subject name in your XML,
-                        // so we add ALL lab names to ensure they appear as separate options.
-                        consolidatedSubjects.set(slot.subject, true);
+                         // Check for the unique lab names that need to be separate options
+                        if (slot.subject.includes('CS501 Lab - TOC Lab') || slot.subject.includes('CS502 Lab - DBMS Lab')) {
+                             consolidatedSubjects.set(slot.subject, true);
+                        }
                     }
                 }
             }
@@ -118,31 +118,11 @@ export class AdminDashboard {
         processTimetable(timetableA);
         processTimetable(timetableB);
         
-        const finalUniqueNames = new Set();
-        
-        const subjectCodeMap = new Map(); 
-
-        subjectsFromConfig.forEach(subject => {
-            subjectCodeMap.set(subject.code, `${subject.code} - ${subject.name}`);
-        });
-        
-        const allSlotNames = Array.from(consolidatedSubjects.keys());
-
-        allSlotNames.forEach(name => {
-            const code = name.split(' ')[0];
-            // If the name is different from the stored official name, add it as a unique option.
-            if (subjectCodeMap.has(code) && subjectCodeMap.get(code) !== name) {
-                 finalUniqueNames.add(name);
-            }
-        });
-
-        subjectsFromConfig.forEach(subject => finalUniqueNames.add(`${subject.code} - ${subject.name}`));
+        // 3. FINALIZE LIST: Get the unique names (keys) and sort them.
+        const selectorOptions = Array.from(consolidatedSubjects.keys()).sort();
 
 
-        const selectorOptions = Array.from(finalUniqueNames).sort();
-
-
-        // 5. Populate Selectors (rest of the logic)
+        // 4. Populate Selectors
         const selectors = [
             document.getElementById('manualClassSelector'),
             document.getElementById('cancelClassSelector')
@@ -170,7 +150,7 @@ export class AdminDashboard {
             });
         });
     }
-    
+        
             
     async loadRegisteredStudents() {
         console.log("Admin: Fetching registered students...");
