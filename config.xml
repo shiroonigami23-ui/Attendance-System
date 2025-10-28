@@ -40,33 +40,33 @@
                 <slot time="10:00-10:50" subject="CS502 - Database Management System" type="Theory" room="S20"/>
                 <slot time="10:50-11:40" subject="CS504 - Internet and Web Development" type="Theory" room="S20"/>
                 <slot time="11:40-12:30" subject="CS507 - Internship-3" type="Theory" room="S20"/>
-                <slot time="13:20-15:00" subject="CS502 Lab - DBMS Lab" type="Lab" room="CM LAB"/>
+                <slot time="13:20-15:00" subject="CS502 Lab - DBMS Lab" type="Lab" room="CM LAB"/> 
                 <slot time="15:00-15:50" subject="SELF STUDY" type="Break" room="-"/>
             </day>
             <day name="Tuesday">
                 <slot time="09:10-10:00" subject="CS502 - Database Management System" type="Theory" room="S20"/>
                 <slot time="10:00-10:50" subject="CS504 - Internet and Web Development" type="Theory" room="S20"/>
-                <slot time="10:50-12:30" subject="CS506 - Python Lab" type="Lab" room="NET LAB"/>
-                <slot time="13:20-15:00" subject="CS503 - Data Analytics" type="Theory" room="NET LAB"/>
-                <slot time="15:00-15:50" subject="CS505 - Linux Lab" type="Lab" room="NET LAB"/>
-            </day>
+                <slot time="10:50-12:30" subject="CS506 - Python Lab" type="Lab" room="NET LAB"/> 
+                <slot time="13:20-14:10" subject="CS503 - Data Analytics" type="Theory" room="NET LAB"/>
+                <slot time="14:10-15:50" subject="CS505 - Linux Lab" type="Lab" room="NET LAB"/> </day>
             <day name="Wednesday">
                 <slot time="09:10-10:00" subject="CS502 - Database Management System" type="Theory" room="S20"/>
                 <slot time="10:00-10:50" subject="CS501 - Theory of Computation" type="Theory" room="S20"/>
-                <slot time="10:50-12:30" subject="CS501 Lab - TOC Lab" type="Lab" room="CM LAB"/>
-                <slot time="13:20-15:00" subject="CS508 - Minor Project" type="Lab" room="-"/>
+                <slot time="10:50-12:30" subject="CS501 Lab - TOC Lab" type="Lab" room="CM LAB"/> 
+                <slot time="13:20-15:00" subject="CS508 - Minor Project" type="Lab" room="-"/> 
                 <slot time="15:00-15:50" subject="CS503 - Data Analytics" type="Theory" room="S21"/>
             </day>
             <day name="Thursday">
-                <slot time="09:10-11:40" subject="CS506 - Python Lab" type="Lab" room="CM LAB"/>
-                <slot time="11:40-12:30" subject="CS507 - Internship-3" type="Theory" room="-"/>
-                <slot time="13:20-14:10" subject="CS501 - Theory of Computation" type="Theory" room="S20"/>
-                <slot time="14:10-15:00" subject="CS503 - Data Analytics" type="Theory" room="CM LAB"/>
-                <slot time="15:00-15:50" subject="CS504 - Internet and Web Development" type="Theory" room="S21"/>
+                <slot time="09:10-10:50" subject="CS506 - Python Lab" type="Lab" room="CM LAB"/> 
+                <slot time="10:50-11:40" subject="CS507 - Internship-3" type="Theory" room="-"/>
+                <slot time="11:40-12:30" subject="CS501 - Theory of Computation" type="Theory" room="S20"/>
+                <slot time="13:20-14:10" subject="CS503 - Data Analytics" type="Theory" room="CM LAB"/>
+                <slot time="14:10-15:00" subject="CS504 - Internet and Web Development" type="Theory" room="S21"/>
+                <slot time="15:00-15:50" subject="SELF STUDY" type="Break" room="-"/>
             </day>
             <day name="Friday">
-                <slot time="09:10-10:50" subject="CS508 - Minor Project" type="Lab" room="-"/>
-                <slot time="10:50-12:30" subject="CS505 - Linux Lab" type="Lab" room="CM LAB"/>
+                <slot time="09:10-10:50" subject="CS508 - Minor Project" type="Lab" room="-"/> 
+                <slot time="10:50-12:30" subject="CS505 - Linux Lab" type="Lab" room="CM LAB"/> 
                 <slot time="13:20-14:10" subject="CS503 - Data Analytics" type="Theory" room="S21"/>
                 <slot time="14:10-15:00" subject="CS507 - Internship-3" type="Theory" room="-"/>
                 <slot time="15:00-15:50" subject="SELF STUDY" type="Break" room="-"/>
@@ -75,14 +75,13 @@
 
         <section id="B">
             <day name="Monday">
-                <slot time="09:10-10:50" subject="CS505 - Linux Lab" type="Lab" room="NET LAB"/>
+                <slot time="09:10-10:50" subject="CS505 - Linux Lab" type="Lab" room="NET LAB"/> 
                 <slot time="10:50-11:40" subject="CS501 - Theory of Computation" type="Theory" room="S23"/>
                 <slot time="11:40-12:30" subject="SELF STUDY" type="Break" room="-"/>
                 <slot time="13:20-14:10" subject="CS504 - Internet and Web Development" type="Theory" room="NET LAB"/>
-                <slot time="14:10-15:50" subject="CS506 Lab - Python Lab" type="Lab" room="NET LAB"/>
-            </day>
+                <slot time="14:10-15:50" subject="CS506 Lab - Python Lab" type="Lab" room="NET LAB"/> </day>
             <day name="Tuesday">
-                <slot time="09:10-10:50" subject="CS501 Lab - TOC Lab" type="Lab" room="NET LAB"/>
+                <slot time="09:10-10:50" subject="CS501 Lab - TOC Lab" type="Lab" room="NET LAB"/> 
                 <slot time="10:50-11:40" subject="CS502 - Database Management System" type="Theory" room="S20"/>
                 <slot time="11:40-12:30" subject="CS501 - Theory of Computation" type="Theory" room="S20"/>
                 <slot time="13:20-14:10" subject="CS503 - Data Analytics" type="Theory" room="CM LAB"/>
@@ -92,7 +91,7 @@
             <day name="Wednesday">
                 <slot time="09:10-10:00" subject="CS504 - Internet and Web Development" type="Theory" room="NET LAB"/>
                 <slot time="10:00-10:50" subject="CS507 - Internship-3" type="Theory" room="-"/>
-                <slot time="10:50-12:30" subject="CS505 - Linux Lab" type="Lab" room="NET LAB"/>
+                <slot time="10:50-12:30" subject="CS505 - Linux Lab" type="Lab" room="NET LAB"/> 
                 <slot time="13:20-14:10" subject="CS502 - Database Management System" type="Theory" room="S20"/>
                 <slot time="14:10-15:00" subject="SELF STUDY" type="Break" room="-"/>
                 <slot time="15:00-15:50" subject="CS503 - Data Analytics" type="Theory" room="S 20"/>
@@ -100,17 +99,15 @@
             <day name="Thursday">
                 <slot time="09:10-10:00" subject="CS501 - Theory of Computation" type="Theory" room="S 20"/>
                 <slot time="10:00-10:50" subject="CS507 - Internship-3" type="Theory" room="-"/>
-                <slot time="10:50-12:30" subject="CS502 Lab - DBMS Lab" type="Lab" room="CMLAB"/>
+                <slot time="10:50-12:30" subject="CS502 Lab - DBMS Lab" type="Lab" room="CMLAB"/> 
                 <slot time="13:20-14:10" subject="CS503 - Data Analytics" type="Theory" room="NET LAB"/>
-                <slot time="14:10-15:50" subject="CS508 - Minor Project" type="Lab" room="-"/>
-            </day>
+                <slot time="14:10-15:50" subject="CS508 - Minor Project" type="Lab" room="-"/> </day>
             <day name="Friday">
-                <slot time="09:10-10:50" subject="CS506 - Python Lab" type="Lab" room="CM LAB"/>
+                <slot time="09:10-10:50" subject="CS506 - Python Lab" type="Lab" room="CM LAB"/> 
                 <slot time="10:50-11:40" subject="CS502 - Database Management System" type="Theory" room="S20"/>
                 <slot time="11:40-12:30" subject="CS504 - Internet and Web Development" type="Theory" room="S20"/>
                 <slot time="13:20-14:10" subject="CS503 - Data Analytics" type="Theory" room="S20"/>
-                <slot time="14:10-15:50" subject="CS508 - Minor Project" type="Lab" room="-"/>
-            </day>
+                <slot time="14:10-15:50" subject="CS508 - Minor Project" type="Lab" room="-"/> </day>
         </section>
     </timetable>
 </attendance-system-config>
