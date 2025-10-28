@@ -613,10 +613,12 @@ export class AdminDashboard {
         const today = new Date();
         const todayStr = today.toISOString().split('T')[0];
 
+        // 1. VALIDATION 1: Skip synchronization for future dates (tomorrow or later).
         if (dateStr > todayStr) {
             console.log(`Skipping synchronization for future date: ${dateStr}.`);
             return;
         }
+        
         if (date < this.classStartDate) {
             console.log(`Skipping DB write for ${dateStr} (before official start date).`);
             return;
@@ -638,24 +640,51 @@ export class AdminDashboard {
             const studentsInSection = this.registeredStudents.filter(s => s.section === sectionId);
             if (studentsInSection.length === 0) continue;
 
-            const uniqueClasses = [...new Set(Object.values(daySchedule)
-                .filter(slot => slot.type.toLowerCase() !== 'break' && !slot.subject.toLowerCase().includes('study'))
-                .map(slot => slot.subject))];
+            // Get all scheduled class slots (Theory + Lab)
+            const scheduledSlots = Object.entries(daySchedule)
+                .filter(([timeSlot, slotInfo]) => slotInfo.type.toLowerCase() !== 'break' && !slotInfo.subject.toLowerCase().includes('study'));
 
-            for (const className of uniqueClasses) {
+            for (const [timeSlot, slotInfo] of scheduledSlots) {
+                const className = slotInfo.subject;
+                const subjectCode = className.split(' ')[0]; // Standardized subject code (e.g., CS501)
+                
+                // --- 2. VALIDATION 2: NEW TIME CHECK (Only for TODAY) ---
+                if (dateStr === todayStr) {
+                    const latestEndTimeStr = timeSlot.split('-')[1];
+                    const [endHour, endMinute] = latestEndTimeStr.split(':').map(Number);
+                    
+                    const classEndDateTime = new Date();
+                    classEndDateTime.setHours(endHour, endMinute, 0, 0);
+
+                    // Skip this class if its scheduled end time has not yet passed.
+                    if (new Date() < classEndDateTime) {
+                        console.log(`Skipping ${className} at ${timeSlot}. Class not over yet.`);
+                        continue; 
+                    }
+                }
+                // --- END NEW TIME CHECK ---
+                
+                // If we reach here, the class is either in the past or has concluded today.
                 for (const student of studentsInSection) {
+                    
+                    // We check if a record exists using the full class name (which is the DB key)
                     const attendanceRef = doc(db, "attendance", student.rollNumber, "records", dateStr, "subjects", className);
                     const docSnap = await getDoc(attendanceRef);
+                    
                     if (!docSnap.exists()) {
+                        // Mark as absent because the class is over and no record was found.
                         await setDoc(attendanceRef, { status: 'absent', subject: className, markedBy: 'system', timestamp: new Date() });
+                        
+                        // Ensure parent document exists
                         const parentRecordRef = doc(db, "attendance", student.rollNumber, "records", dateStr);
                         await setDoc(parentRecordRef, { synced: new Date() }, { merge: true });
-                    }
                     }
                 }
             }
         }
-
+    }
+    
+        
 
 
     async generateClassReport() {
