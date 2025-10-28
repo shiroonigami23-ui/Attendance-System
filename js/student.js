@@ -372,25 +372,29 @@ export class StudentDashboard {
         const windowMessage = document.getElementById('attendanceWindowMessage');
         const qrScanner = document.getElementById('qrScanner');
         let isWindowOpen = false;
+        let windowEnd = null; // Variable to store the specific end time
 
         if (daySchedule) {
             for (const [timeSlot, classInfo] of Object.entries(daySchedule)) {
                 if (classInfo.subject.toLowerCase().includes('study') || classInfo.type.toLowerCase() === 'break') continue;
 
+                // Extract the end time of the class
                 const [startTimeStr, endTimeStr] = timeSlot.split('-');
-                const [startHour, startMinute] = startTimeStr.split(':').map(Number);
+                const [endHour, endMinute] = endTimeStr.split(':').map(Number);
                 
-                const classStart = new Date();
-                classStart.setHours(startHour, startMinute, 0, 0);
+                const classEnd = new Date();
+                classEnd.setHours(endHour, endMinute, 0, 0);
 
-                const windowStart = classStart;
-                const windowEnd = new Date(classStart.getTime() + 5 * 60000);
+                // Define the new 5-minute window: 3 min before end, 2 min after end
+                const windowStart = new Date(classEnd.getTime() - 3 * 60000); // 3 minutes before end time
+                const calculatedWindowEnd = new Date(classEnd.getTime() + 2 * 60000); // 2 minutes after end time
 
-                if (now >= windowStart && now <= windowEnd) {
+                if (now >= windowStart && now <= calculatedWindowEnd) {
                     isWindowOpen = true;
+                    windowEnd = calculatedWindowEnd;
                     windowMessage.textContent = `Window for ${classInfo.subject} is OPEN until ${Utils.formatTime(windowEnd)}!`;
 
-                    // --- NEW: Send Notification if window just opened ---
+                    // Send Notification if window just opened
                     const notificationId = `${now.toISOString().split('T')[0]}-${timeSlot}`;
                     if (!this.notifiedWindows.has(notificationId)) {
                         Utils.showNotification('Attendance Window Open!', {
@@ -413,6 +417,8 @@ export class StudentDashboard {
             qrScanner.querySelector('small').textContent = '(Currently Disabled)';
         }
     }
+    
+                    
 
     async markAttendance() {
         const qrScanner = document.getElementById('qrScanner');
