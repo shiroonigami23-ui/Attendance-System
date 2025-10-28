@@ -338,6 +338,8 @@ export class AdminDashboard {
         }
     }
 
+    // js/admin.js
+
     async markManualAttendance() {
         const rollNumber = document.getElementById('manualRollNumber').value;
         const newStatus = document.getElementById('attendanceStatus').value;
@@ -357,8 +359,8 @@ export class AdminDashboard {
             Utils.showAlert('Please select a date, roll number, and class.', 'warning');
             return;
         }
-
-        const subjectCode = fullClassNameFromSelector.split(' - ')[0]; 
+        
+        const subjectCode = fullClassNameFromSelector.split(' - ')[0]; // Used for validation check only
         
         const student = this.registeredStudents.find(s => s.rollNumber === rollNumber);
         if (!student) {
@@ -377,7 +379,7 @@ export class AdminDashboard {
         
         const classCode = fullClassNameFromSelector.split(' - ')[0].replace(/\s/g, '');
         
-        // Find all slots for this subject today
+        // Find all slots for this subject today (using the short code for checking validity)
         const subjectSlots = Object.entries(daySchedule)
             .filter(([timeSlot, slotInfo]) => slotInfo.subject.replace(/\s/g, '').includes(classCode));
         
@@ -392,17 +394,14 @@ export class AdminDashboard {
             // 1. Find the LATEST end time among all slots for this class today.
             const latestEndTimeStr = subjectSlots
                 .map(([timeSlot, slotInfo]) => timeSlot.split('-')[1])
-                .sort() // Simple string sort works for HH:MM format
+                .sort() 
                 .pop();
             
             if (latestEndTimeStr) {
                 const [endHour, endMinute] = latestEndTimeStr.split(':').map(Number);
-                
-                // 2. Create a Date object for the class's scheduled end time today.
                 const classEndDateTime = new Date();
                 classEndDateTime.setHours(endHour, endMinute, 0, 0);
 
-                // 3. Check if the class is still in the future.
                 if (new Date() < classEndDateTime) {
                     Utils.showAlert(`Cannot mark attendance. The last scheduled slot for this class ends at ${latestEndTimeStr}.`, 'danger');
                     return;
@@ -411,7 +410,8 @@ export class AdminDashboard {
         }
         
         // All validation passed. Proceed with DB operations.
-        const attendanceRef = doc(db, "attendance", rollNumber, "records", dateStr, "subjects", subjectCode);
+        // --- CRITICAL FIX: Use the FULL Class Name as the Document ID ---
+        const attendanceRef = doc(db, "attendance", rollNumber, "records", dateStr, "subjects", fullClassNameFromSelector);
         const parentRecordRef = doc(db, "attendance", rollNumber, "records", dateStr); 
         
         try {
@@ -432,7 +432,6 @@ export class AdminDashboard {
                     });
                     
                     await setDoc(parentRecordRef, { updated: new Date() }, { merge: true });
-
                     Utils.showAlert('Attendance record updated successfully!', 'success');
                 }
             } else {
@@ -444,7 +443,6 @@ export class AdminDashboard {
                 });
                 
                 await setDoc(parentRecordRef, { created: new Date() }, { merge: true });
-
                 Utils.showAlert(`Attendance marked successfully for ${rollNumber}!`, 'success');
             }
              document.getElementById('manualRollNumber').value = '';
@@ -453,7 +451,7 @@ export class AdminDashboard {
             Utils.showAlert('Failed to save attendance. Check console for details.', 'danger');
         }
     }
-                    
+
     
 
     async cancelClass() {
@@ -601,6 +599,8 @@ export class AdminDashboard {
         Utils.showAlert(`Successfully cancelled all classes for ${dateStr}.`, 'success');
     }
 
+    // js/admin.js
+
     async synchronizeAttendanceForDate(dateStr) {
         const date = new Date(dateStr + 'T00:00:00');
         const today = new Date();
@@ -639,7 +639,8 @@ export class AdminDashboard {
 
             for (const [timeSlot, slotInfo] of scheduledSlots) {
                 const className = slotInfo.subject;
-                const subjectCode = className.split(' ')[0]; // Standardized subject code (e.g., CS501)
+                // --- CRITICAL FIX: Use the FULL Class Name as the Document ID ---
+                const subjectNameAsKey = className; 
                 
                 // --- 2. VALIDATION 2: NEW TIME CHECK (Only for TODAY) ---
                 if (dateStr === todayStr) {
@@ -661,7 +662,7 @@ export class AdminDashboard {
                 for (const student of studentsInSection) {
                     
                     // We check if a record exists using the full class name (which is the DB key)
-                    const attendanceRef = doc(db, "attendance", student.rollNumber, "records", dateStr, "subjects", className);
+                    const attendanceRef = doc(db, "attendance", student.rollNumber, "records", dateStr, "subjects", subjectNameAsKey);
                     const docSnap = await getDoc(attendanceRef);
                     
                     if (!docSnap.exists()) {
@@ -676,9 +677,6 @@ export class AdminDashboard {
             }
         }
     }
-    
-        
-
 
     async generateClassReport() {
         const reportType = document.getElementById('reportType').value;
