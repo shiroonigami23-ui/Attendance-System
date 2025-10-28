@@ -419,7 +419,6 @@ export class StudentDashboard {
     }
     
                     
-
     async markAttendance() {
         const qrScanner = document.getElementById('qrScanner');
         if (qrScanner.classList.contains('disabled')) {
@@ -436,14 +435,18 @@ export class StudentDashboard {
 
         if (daySchedule) {
             for (const [timeSlot, classInfo] of Object.entries(daySchedule)) {
-                 const [startTimeStr] = timeSlot.split('-');
-                 const [startHour, startMinute] = startTimeStr.split(':').map(Number);
+                 // --- Attendance Window Check Logic (Simplified for the sake of this block) ---
+                 const [endTimeStr] = timeSlot.split('-').map(s => s.trim()).reverse();
+                 const [endHour, endMinute] = endTimeStr.split(':').map(Number);
                 
-                const classStart = new Date();
-                classStart.setHours(startHour, startMinute, 0, 0);
-                const windowEnd = new Date(classStart.getTime() + 5 * 60000);
+                const classEnd = new Date();
+                classEnd.setHours(endHour, endMinute, 0, 0);
+                
+                // Define the 5-minute window: 3 min before end, 2 min after end
+                const windowStart = new Date(classEnd.getTime() - 3 * 60000); 
+                const calculatedWindowEnd = new Date(classEnd.getTime() + 2 * 60000); 
 
-                if (now >= classStart && now <= windowEnd) {
+                if (now >= windowStart && now <= calculatedWindowEnd) {
                     currentClassInfo = classInfo;
                     break;
                 }
@@ -455,15 +458,14 @@ export class StudentDashboard {
             return;
         }
         
-        // --- CRITICAL FIX: Extract the Subject Code for a standardized database key ---
-        // Assumes subject code is the first word/token in the subject string (e.g., 'CS501' from 'CS501' or 'CS 506 LAB B1+B2')
-        const subjectCode = currentClassInfo.subject.split(' ')[0]; 
+        // --- CRITICAL FIX: Use the FULL name as the DB Key (Document ID) ---
+        const subjectNameAsKey = currentClassInfo.subject; 
         
         const className = `${currentClassInfo.subject}`; // Full class name for storage
         const dateStr = now.toISOString().split('T')[0];
         
-        // --- Use the standardized subjectCode as the document ID ---
-        const attendanceRef = doc(db, "attendance", this.currentUser.rollNumber, "records", dateStr, "subjects", subjectCode); 
+        // Use the FULL class name as the document ID
+        const attendanceRef = doc(db, "attendance", this.currentUser.rollNumber, "records", dateStr, "subjects", subjectNameAsKey); 
 
         try {
             const docSnap = await getDoc(attendanceRef);
@@ -490,6 +492,9 @@ export class StudentDashboard {
             Utils.showAlert('Failed to mark attendance. Please try again.', 'danger');
         }
     }
+    
+    
+                
     
 // --- NEW: Checks for class cancellation notices ---
     async checkForCancellations() {
