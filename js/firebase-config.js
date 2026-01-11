@@ -3,7 +3,7 @@ import { getFirestore } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyCg_pcmS3dU8bH-grlPnYYUy_vwJR9KqSk",
+  apiKey: "FIREBASE_API_KEY_PLACEHOLDER",
   authDomain: "my-attendance-app-eb967.firebaseapp.com",
   projectId: "my-attendance-app-eb967",
   storageBucket: "my-attendance-app-eb967.appspot.com", // Corrected domain
