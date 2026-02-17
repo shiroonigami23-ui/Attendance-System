@@ -1,0 +1,2 @@
+RewriteEngine On
+RewriteRule ^Attendance_System/test$ test-rewrite.php [L]

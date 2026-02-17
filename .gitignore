@@ -1,0 +1,24 @@
+# Credentials and env
+.env
+.env.*
+!.env.example
+
+# Logs and temp
+log.txt
+save.txt
+progress_summary.txt
+*.log
+
+# User uploads (keep structure; add .gitkeep in assets/uploads if needed)
+assets/uploads/*
+!assets/uploads/.gitkeep
+
+# IDE and OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Optional: local config override (if you add one)
+includes/Config.local.php
