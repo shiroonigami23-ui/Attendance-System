@@ -1,81 +1,146 @@
-# 📱 Advanced Campus Attendance System
+# Advanced Campus Attendance System (ACAS)
 
-![Status](https://img.shields.io/badge/Status-Live-success)
-![Role](https://img.shields.io/badge/User_Roles-Student_&_Admin-blue)
-![Security](https://img.shields.io/badge/Security-Device_Lock-red)
-
-> **A smart, secure, and device-locked attendance management solution for educational institutions.**
-
-**Attendance System** is a web-based platform designed to streamline the attendance process. It features a dual-interface system for Students and Admins, real-time analytics, and a unique **Device Lock Security** feature that prevents students from marking attendance on behalf of others by binding their account to a single device.
+A PHP/MySQL web application for campus attendance with role-based access (Students, Teachers, Master Admin), device fingerprinting, live QR/TOTP sessions, and leave management.
 
 ---
 
-## 🔗 Live Demo
+## Table of contents
 
-**Access the portal here:**
-### [🏫 Launch Attendance System](https://shiroonigami23-ui.github.io/Attendance-System/)
-
----
-
-## ✨ Key Features
-
-### 🔐 Security & Integrity
-- **Device Locking:** When a student logs in for the first time, their account is permanently bound to that specific device. Attempting to log in from another phone/laptop triggers a "Device Mismatch" error.
-- **Admin Reset:** Only admins can clear device data to allow a student to switch devices.
-
-### 🎓 Student Dashboard
-- **Live Stats:** View Total Present, Absent, Total Classes, and Overall Percentage at a glance.
-- **Mark Attendance:** Scan QR codes or tap-to-mark (enabled only during active windows).
-- **Attendance Calculator:** A predictive tool ("If I attend the next X classes...") to help students plan their attendance goals.
-- **Detailed History:**
-  - **Subject-wise Summary:** Table view of attendance per subject.
-  - **Calendar View:** Visual representation of attendance over the month.
-  - **Daily Log:** Timestamped history of when attendance was marked.
-
-### 🛡️ Admin Dashboard
-- **Overview Panel:** Real-time counters for Total Students, Active Students, and System Status.
-- **Student Management:** View registered students, their device IDs, last login times, and manage their access.
-- **Manual Override:** Manually mark attendance (Present/Absent/Late) for any student.
-- **Class Cancellation:** Cancel specific classes or declare a holiday for the entire day (notifies students).
-- **Reports:** Generate and export CSV reports for:
-  - Daily Attendance
-  - Weekly Summaries
-  - Monthly Defaulter Lists
-- **System Settings:** Bulk logout all students or reset device registrations.
+- [Features](#features)
+- [Project structure](#project-structure)
+- [Requirements](#requirements)
+- [Setup](#setup)
+- [Configuration](#configuration)
+- [Folder overview](#folder-overview)
+- [Legacy frontend](#legacy-frontend)
 
 ---
 
-## 🎮 How to Use
+## Features
 
-### For Students
-1. **Login/Register:** Enter your Roll Number and select your Section (A/B).
-2. **Dashboard:** Check your current percentage.
-3. **Mark Attendance:** Click the "Tap to Scan" button when the teacher opens the attendance window.
-4. **Predict:** Use the calculator to see how many classes you need to attend to reach 75%.
+| Role | Description |
+|------|-------------|
+| **Student** | Login, dashboard, mark attendance via QR/TOTP, timetable, leave apply, reports |
+| **Teacher (SEMI_ADMIN)** | Live sessions (start/close), swap requests, leave apply, manual override, red zone, reports |
+| **Master Admin** | Full control: grace console, semester promotion, substitute management, cancel classes, subject/timetable config |
 
-### For Admins
-1. **Login:** Use the Admin credentials.
-2. **Manage:** Use the sidebar to navigate between Students, Attendance, and Reports.
-3. **Handle Issues:** If a student loses their phone, go to "Registered Students" and reset their device ID.
-4. **Export:** Go to "Reports" to download the monthly attendance sheet for the dean.
+- **Security:** Device fingerprint binding, Argon2id password hashing, session management  
+- **Live attendance:** 10-second TOTP tokens; students scan QR or enter token  
+- **Leave system:** Student and teacher leave applications with uploads  
 
 ---
 
-## 📸 Screenshots
+## Project structure
 
-| Student Dashboard | Admin Control Panel |
-|:---:|:---:|
-| *Stats, Calculator & History* | *Manage Students & Reports* |
-
-*(Note: Screenshots can be added here)*
+```
+Attendance_System/
+├── README.md                 ← You are here
+├── .gitignore
+├── .htaccess
+│
+├── index.php                 # Landing (guest)
+├── login.php                 # Login page
+├── login_handler.php         # Login processing
+├── logout.php                # Global logout
+├── register.php              # Registration form
+├── register_handler.php      # Registration processing
+├── dashboard.php             # Role-based redirect after login
+├── profile.php               # User profile & password change
+│
+├── about.php | academics.php | admission.php | contact.php
+├── feature.php | faculty.php | help.php | privacy.php | research.php | terms.php
+├── check_swap_tables.php      # Swap tables check
+├── sql_check.php             # DB structure diagnostic (uses [includes/Config.php](includes/Config.php))
+│
+├── admin/                    # Master admin area → [admin/README.md](admin/README.md)
+├── api/                      # JSON APIs → [api/README.md](api/README.md)
+├── assets/                   # Static files & uploads → [assets/README.md](assets/README.md)
+├── includes/                 # Config, auth, navbar → [includes/README.md](includes/README.md)
+├── student/                  # Student portal → [student/README.md](student/README.md)
+├── teacher/                  # Teacher portal → [teacher/README.md](teacher/README.md)
+└── _backup_old/              # Legacy Firebase SPA → [_backup_old/README.md](_backup_old/README.md)
+```
 
 ---
 
-## 💻 Local Installation
+## Requirements
 
-To run this system locally:
+- **PHP** 7.4+ (with PDO MySQL, session, GD for uploads)
+- **MySQL** 5.7+ / MariaDB
+- **Web server:** Apache (XAMPP/WAMP) or nginx with PHP-FPM
 
-1. **Clone the repository:**
+---
+
+## Setup
+
+1. **Clone the repo**
    ```bash
-   git clone [https://github.com/shiroonigami23-ui/Attendance-System.git](https://github.com/shiroonigami23-ui/Attendance-System.git)
-   
+   git clone https://github.com/shiroonigami23-ui/Attendance-System.git
+   cd Attendance-System
+   ```
+
+2. **Database**
+   - Create a MySQL database (e.g. `attendance_system`).
+   - Import schema/migrations if present in the repo or your docs.
+   - Set DB credentials via [Configuration](#configuration).
+
+3. **Document root**
+   - Point your web server (or XAMPP `htdocs`) to the project root so that `index.php`, `login.php`, etc. are served at e.g. `http://localhost/Attendance_System/`.
+
+4. **Configuration**
+   - Copy or set environment variables (see [Configuration](#configuration)).
+   - Ensure `includes/Config.php` is not overwritten by deployments if you use env-based config.
+
+5. **Uploads**
+   - Ensure `assets/uploads/` (and subfolders like `assets/uploads/leaves`, `assets/uploads/teacher_leaves`) exist and are writable by the web server.
+
+---
+
+## Configuration
+
+Credentials are **not** committed. Use environment variables or a local override.
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `DB_HOST` | MySQL host | `localhost` |
+| `DB_NAME` | Database name | `attendance_system` |
+| `DB_USER` | MySQL user | your user |
+| `DB_PASS` | MySQL password | your password |
+| `BASE_URL` | App base URL | `http://localhost/Attendance_System/` |
+| `SALT_DEVICE` | Device fingerprint salt | random string |
+| `DEFAULT_STUDENT_PASSWORD` | Default password for new students | (optional) |
+| `DEFAULT_TEACHER_PASSWORD` | Default password for new teachers | (optional) |
+
+- **Config file:** [includes/Config.php](includes/Config.php) reads these and falls back to placeholders so the app runs after you set env (or edit placeholders for local dev).
+
+---
+
+## Folder overview
+
+| Folder | Purpose | README |
+|--------|----------|--------|
+| [admin/](admin/) | Master admin: grace, promotion, substitutes, cancel classes | [admin/README.md](admin/README.md) |
+| [api/](api/) | REST-like endpoints (e.g. mark attendance, subjects) | [api/README.md](api/README.md) |
+| [assets/](assets/) | CSS, JS, icons, uploads (profile pics, leave attachments) | [assets/README.md](assets/README.md) |
+| [includes/](includes/) | Config, Auth, navbar, SessionManager | [includes/README.md](includes/README.md) |
+| [student/](student/) | Student login, dashboard, scanner, leave, report, timetable | [student/README.md](student/README.md) |
+| [teacher/](teacher/) | Teacher dashboard, live session, swap, leave, reports | [teacher/README.md](teacher/README.md) |
+| [_backup_old/](_backup_old/) | Legacy Firebase-based SPA (optional) | [_backup_old/README.md](_backup_old/README.md) |
+
+---
+
+## Legacy frontend
+
+The [_backup_old/](_backup_old/) directory contains an older Firebase-based single-page app (student/admin). It is optional. The main application is the PHP stack described above. See [_backup_old/README.md](_backup_old/README.md) for its structure and usage.
+
+---
+
+## Quick links to key files
+
+- [includes/Config.php](includes/Config.php) — Database and app config  
+- [includes/Auth.php](includes/Auth.php) — Auth and device fingerprint checks  
+- [login.php](login.php) — Login page  
+- [login_handler.php](login_handler.php) — Login processing  
+- [dashboard.php](dashboard.php) — Post-login role redirect  
+- [api/mark_attendance.php](api/mark_attendance.php) — Mark attendance API  
+- [.gitignore](.gitignore) — Ignored files (logs, uploads, .env)

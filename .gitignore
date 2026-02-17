@@ -1,0 +1,65 @@
+# Environment and configuration files
+.env
+.env.*
+!.env.example
+config.local.php
+db_config.php
+
+# Database files
+*.sql
+*.dump
+*.db
+*.sqlite
+
+# Logs
+*.log
+logs/
+error_log
+log.txt
+progress_summary.txt
+save.txt
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Git
+.git/
+
+# Node modules (if any)
+node_modules/
+
+# Vendor (if using Composer)
+vendor/
+
+# Uploaded files (if any)
+uploads/
+files/
+
+# Session files
+sessions/
+
+# Any file with sensitive data
+*secret*
+*private*
+*credential*
+*password*
