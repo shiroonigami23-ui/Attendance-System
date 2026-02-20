@@ -5,16 +5,16 @@ require_once '../includes/Config.php';
 if (isset($_SESSION['user_id']) && isset($_SESSION['role'])) {
     switch ($_SESSION['role']) {
         case 'STUDENT':
-            header('Location: student/dashboard.php');
+            header('Location: dashboard.php');
             exit();
         case 'SEMI_ADMIN':
-            header('Location: teacher/dashboard.php');
+            header('Location: ../teacher/dashboard.php');
             exit();
         case 'MASTER':
-            header('Location: admin/dashboard.php');
+            header('Location: ../admin/dashboard.php');
             exit();
         default:
-            header('Location: dashboard.php');
+            header('Location: ../dashboard.php');
             exit();
     }
 }

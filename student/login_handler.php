@@ -169,16 +169,16 @@ function redirectBasedOnRole() {
     
     switch ($_SESSION['role']) {
         case 'STUDENT':
-            header('Location: student/dashboard.php');
+            header('Location: dashboard.php');
             break;
         case 'SEMI_ADMIN':
-            header('Location: teacher/dashboard.php');
+            header('Location: ../teacher/dashboard.php');
             break;
         case 'MASTER':
-            header('Location: admin/dashboard.php');
+            header('Location: ../admin/dashboard.php');
             break;
         default:
-            header('Location: dashboard.php');
+            header('Location: ../dashboard.php');
     }
     exit();
 }

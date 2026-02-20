@@ -12,8 +12,8 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'STUDENT') {
 }
 
 $input = json_decode(file_get_contents('php://input'), true);
-$session_id = $input['session_id'] ?? 0;
-$token = $input['token'] ?? '';
+$session_id = isset($input['session_id']) ? (int) $input['session_id'] : 0;
+$token = trim((string) ($input['token'] ?? ''));
 
 // RATE LIMITING: Allow 1 request per 5 seconds per user
 if (isset($_SESSION['last_api_request'])) {
@@ -26,7 +26,7 @@ if (isset($_SESSION['last_api_request'])) {
 }
 $_SESSION['last_api_request'] = time();
 
-if (!$session_id || !$token) {
+if ($session_id <= 0 || $token === '') {
     echo json_encode(['success' => false, 'error' => 'Invalid QR data']);
     exit();
 }
@@ -65,16 +65,11 @@ if ($elapsed > 420) { // 7 minutes
 // Determine status
 $status = $elapsed <= 180 ? 'PRESENT' : 'LATE';
 
-// Check if already marked
-$stmt = $pdo->prepare("SELECT log_id FROM attendance_logs WHERE session_id = ? AND student_id = ?");
-$stmt->execute([$session_id, $_SESSION['user_id']]);
-if ($stmt->fetch()) {
-    echo json_encode(['success' => false, 'error' => 'Attendance already marked']);
-    exit();
-}
-
 // 1. WiFi Subnet Fencing
 $verification_method = 'QR_SCAN';
+$lat = null;
+$lng = null;
+$distance = null;
 if (defined('WIFI_FENCING_ENABLED') && WIFI_FENCING_ENABLED) {
     if (defined('ALLOWED_SUBNETS')) {
         $client_ip = $_SERVER['REMOTE_ADDR'];
@@ -95,10 +90,10 @@ if (defined('WIFI_FENCING_ENABLED') && WIFI_FENCING_ENABLED) {
 // 2. GPS Geolocation Fencing
 if (defined('GEO_FENCING_ENABLED') && GEO_FENCING_ENABLED) {
     if (defined('CAMPUS_LAT') && defined('CAMPUS_LNG')) {
-        $lat = $input['lat'] ?? null;
-        $lng = $input['lng'] ?? null;
+        $lat = isset($input['lat']) ? (float) $input['lat'] : null;
+        $lng = isset($input['lng']) ? (float) $input['lng'] : null;
 
-        if (!$lat || !$lng) {
+        if ($lat === null || $lng === null) {
             echo json_encode(['success' => false, 'error' => 'Location data required. Please enable GPS.']);
             exit();
         }
@@ -117,16 +112,34 @@ if (defined('GEO_FENCING_ENABLED') && GEO_FENCING_ENABLED) {
             echo json_encode(['success' => false, 'error' => "You are " . round($distance) . "m away from class! Max " . ALLOWED_RADIUS . "m allowed."]);
             exit();
         }
-        $verification_method = 'QR_GPS_' . round($distance) . 'm';
     }
 }
 
-// Insert attendance log
-$stmt = $pdo->prepare("
-    INSERT INTO attendance_logs (session_id, student_id, status, verification_method, scanned_at)
-    VALUES (?, ?, ?, ?, NOW())
-");
-$stmt->execute([$session_id, $_SESSION['user_id'], $status, $verification_method]);
+// Insert attendance log (unique key on session_id + student_id handles double-submit)
+try {
+    $stmt = $pdo->prepare("
+        INSERT INTO attendance_logs (session_id, student_id, status, verification_method, geo_lat, geo_long, scanned_at)
+        VALUES (?, ?, ?, ?, ?, ?, NOW())
+    ");
+    $stmt->execute([
+        $session_id,
+        $_SESSION['user_id'],
+        $status,
+        $verification_method,
+        $lat,
+        $lng
+    ]);
+} catch (PDOException $e) {
+    // 1062 = duplicate key: already marked for this session
+    if ((int) $e->errorInfo[1] === 1062) {
+        echo json_encode(['success' => false, 'error' => 'Attendance already marked']);
+        exit();
+    }
+    error_log('mark_attendance insert failed: ' . $e->getMessage());
+    http_response_code(500);
+    echo json_encode(['success' => false, 'error' => 'Server error while marking attendance']);
+    exit();
+}
 
 // Update summary table
 $pdo->prepare("
@@ -156,10 +169,11 @@ $pdo->prepare("
         'session_id' => $session_id,
         'subject' => $session['subject_code'] ?? 'Unknown',
         'status' => $status,
+        'distance_m' => $distance !== null ? round($distance, 2) : null,
         'elapsed_seconds' => $elapsed
     ]),
     $_SERVER['REMOTE_ADDR'],
-    $_SERVER['HTTP_USER_AGENT']
+    $_SERVER['HTTP_USER_AGENT'] ?? 'unknown'
 ]);
 
 echo json_encode([

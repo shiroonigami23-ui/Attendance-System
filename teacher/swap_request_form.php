@@ -1,4 +1,23 @@
 <?php
+if (!isset($pdo)) {
+    require_once '../includes/Config.php';
+}
+if (!function_exists('checkAuth')) {
+    require_once '../includes/Auth.php';
+}
+checkAuth();
+
+if (($_SESSION['role'] ?? '') !== 'SEMI_ADMIN') {
+    header('Location: ../dashboard.php');
+    exit();
+}
+
+$user_id = $user_id ?? (int) ($_SESSION['user_id'] ?? 0);
+if ($user_id <= 0) {
+    header('Location: ../login.php?error=Unauthorized');
+    exit();
+}
+
 // Get teacher's upcoming slots (next 7 days)
 $today = date('Y-m-d');
 $seven_days_later = date('Y-m-d', strtotime('+7 days'));

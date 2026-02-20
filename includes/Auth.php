@@ -1,12 +1,11 @@
 <?php
-require_once 'Config.php';
+require_once __DIR__ . '/Config.php';
 
 function checkAuth() {
     global $pdo;
     
     if (!isset($_SESSION['user_id'], $_SESSION['device_fp'])) {
-        header('Location: login.php');
-        exit();
+        app_redirect('login.php');
     }
     
     // Verify device fingerprint matches
@@ -20,7 +19,7 @@ function checkAuth() {
     
     if (!$lock || $lock['device_fingerprint'] !== $_SESSION['device_fp']) {
         session_destroy();
-        header('Location: login.php?error=Device+mismatch.+Please+re-login.');
+        header('Location: ' . app_url('login.php?error=Device+mismatch.+Please+re-login.'));
         exit();
     }
     

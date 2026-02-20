@@ -144,3 +144,36 @@ The [_backup_old/](_backup_old/) directory contains an older Firebase-based sing
 - [dashboard.php](dashboard.php) — Post-login role redirect  
 - [api/mark_attendance.php](api/mark_attendance.php) — Mark attendance API  
 - [.gitignore](.gitignore) — Ignored files (logs, uploads, .env)
+
+---
+
+## Verification and Load Testing
+
+Run complete local verification:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tests\run_full_verification.ps1 -BaseUrl http://localhost/Attendance_System -Requests 500 -Concurrency 100
+```
+
+Run full 10k attendance stress test:
+
+```powershell
+C:\xampp\php\php.exe tests\load_test_10k.php --requests=10000 --concurrency=200
+```
+
+Notes:
+- `tests/mock_mark_attendance.php` is local-only for stress tests.
+- Load tests can seed temporary students automatically and clean up after run.
+
+---
+
+## AWS Deployment
+
+Detailed guide: [aws/README.md](aws/README.md)
+
+Quick setup:
+
+```bash
+chmod +x aws/setup.sh
+./aws/setup.sh
+```
